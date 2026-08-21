@@ -27,6 +27,7 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -112,7 +113,8 @@ public class AnnualAccountJobConfig {
             PlatformTransactionManager transactionManager,
             FlatFileItemReader<RawAnnualAccount> annualAccountReader,
             AnnualAccountProcessor annualAccountProcessor,
-            JdbcBatchItemWriter<AnnualAccountEntry> annualAccountWriter) {
+            JdbcBatchItemWriter<AnnualAccountEntry> annualAccountWriter,
+            AsyncTaskExecutor batchTaskExecutor) {
 
         return new StepBuilder("annualAccountStep", jobRepository)
                 .<RawAnnualAccount, AnnualAccountEntry>chunk(5)
@@ -120,6 +122,7 @@ public class AnnualAccountJobConfig {
                 .processor(annualAccountProcessor)
                 .writer(annualAccountWriter)
                 .transactionManager(transactionManager)
+                .taskExecutor(batchTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidAnnualAccountException.class,

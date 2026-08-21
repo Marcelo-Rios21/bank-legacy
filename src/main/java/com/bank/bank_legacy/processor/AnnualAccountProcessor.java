@@ -12,6 +12,8 @@ import com.bank.bank_legacy.exception.InvalidAnnualAccountException;
 import com.bank.bank_legacy.model.AnnualAccountEntry;
 import com.bank.bank_legacy.model.RawAnnualAccount;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,9 @@ import org.springframework.stereotype.Component;
 public class AnnualAccountProcessor
         implements ItemProcessor<RawAnnualAccount, AnnualAccountEntry> {
 
+    
+    private static final Logger log =
+            LoggerFactory.getLogger(AnnualAccountProcessor.class);
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
             DateTimeFormatter.ofPattern("uuuu/MM/dd")
@@ -32,6 +37,10 @@ public class AnnualAccountProcessor
     @Override
     public AnnualAccountEntry process(RawAnnualAccount item) {
 
+        
+        log.info("[PARALELO] Hilo {} procesando movimiento de cuenta {}",
+                Thread.currentThread().getName(),
+                item.getCuentaId());
         Long cuentaId = parseCuentaId(item.getCuentaId());
         LocalDate fecha = parseFecha(item.getFecha());
         String transaccion = parseTransaccion(item.getTransaccion());
@@ -50,7 +59,7 @@ public class AnnualAccountProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidAnnualAccountException(
-                    "El id de cuenta está vacío");
+                    "El id de cuenta estÃƒÂ¡ vacÃƒÂ­o");
         }
 
         try {
@@ -65,7 +74,7 @@ public class AnnualAccountProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidAnnualAccountException(
-                    "El id de cuenta no es numérico: " + value);
+                    "El id de cuenta no es numÃƒÂ©rico: " + value);
         }
     }
 
@@ -73,7 +82,7 @@ public class AnnualAccountProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidAnnualAccountException(
-                    "La fecha está vacía");
+                    "La fecha estÃƒÂ¡ vacÃƒÂ­a");
         }
 
         String fecha = value.trim();
@@ -86,14 +95,14 @@ public class AnnualAccountProcessor
         }
 
         throw new InvalidAnnualAccountException(
-                "Fecha inválida: " + value);
+                "Fecha invÃƒÂ¡lida: " + value);
     }
 
     private String parseTransaccion(String value) {
 
         if (value == null || value.isBlank()) {
             throw new InvalidAnnualAccountException(
-                    "El tipo de transacción está vacío");
+                    "El tipo de transacciÃƒÂ³n estÃƒÂ¡ vacÃƒÂ­o");
         }
 
         String transaccion = Normalizer
@@ -108,7 +117,7 @@ public class AnnualAccountProcessor
                 && !transaccion.equals("pago")) {
 
             throw new InvalidAnnualAccountException(
-                    "Tipo de transacción inválido: " + value);
+                    "Tipo de transacciÃƒÂ³n invÃƒÂ¡lido: " + value);
         }
 
         return transaccion;
@@ -118,7 +127,7 @@ public class AnnualAccountProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidAnnualAccountException(
-                    "El monto está vacío");
+                    "El monto estÃƒÂ¡ vacÃƒÂ­o");
         }
 
         try {
@@ -126,7 +135,7 @@ public class AnnualAccountProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidAnnualAccountException(
-                    "El monto no es numérico: " + value);
+                    "El monto no es numÃƒÂ©rico: " + value);
         }
     }
 
@@ -134,7 +143,7 @@ public class AnnualAccountProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidAnnualAccountException(
-                    "La descripción está vacía");
+                    "La descripciÃƒÂ³n estÃƒÂ¡ vacÃƒÂ­a");
         }
 
         return value.trim();

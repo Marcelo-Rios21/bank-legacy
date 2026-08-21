@@ -11,6 +11,8 @@ import com.bank.bank_legacy.exception.InvalidTransactionException;
 import com.bank.bank_legacy.model.DailyTransaction;
 import com.bank.bank_legacy.model.RawTransaction;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,9 @@ import org.springframework.stereotype.Component;
 public class DailyTransactionProcessor
         implements ItemProcessor<RawTransaction, DailyTransaction> {
 
+    
+    private static final Logger log =
+            LoggerFactory.getLogger(DailyTransactionProcessor.class);
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
             DateTimeFormatter.ofPattern("uuuu/MM/dd")
@@ -31,6 +36,10 @@ public class DailyTransactionProcessor
     @Override
     public DailyTransaction process(RawTransaction item) {
 
+        
+        log.info("[PARALELO] Hilo {} procesando transaccion {}",
+                Thread.currentThread().getName(),
+                item.getId());
         Long id = parseId(item.getId());
         LocalDate fecha = parseFecha(item.getFecha());
         BigDecimal monto = parseMonto(item.getMonto());
@@ -46,7 +55,7 @@ public class DailyTransactionProcessor
 
     private Long parseId(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidTransactionException("El id está vacío");
+            throw new InvalidTransactionException("El id estÃƒÆ’Ã‚Â¡ vacÃƒÆ’Ã‚Â­o");
         }
 
         try {
@@ -62,14 +71,14 @@ public class DailyTransactionProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidTransactionException(
-                    "El id no es numérico: " + value
+                    "El id no es numÃƒÆ’Ã‚Â©rico: " + value
             );
         }
     }
 
     private LocalDate parseFecha(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidTransactionException("La fecha está vacía");
+            throw new InvalidTransactionException("La fecha estÃƒÆ’Ã‚Â¡ vacÃƒÆ’Ã‚Â­a");
         }
 
         String fecha = value.trim();
@@ -83,13 +92,13 @@ public class DailyTransactionProcessor
         }
 
         throw new InvalidTransactionException(
-                "Fecha inválida: " + value
+                "Fecha invÃƒÆ’Ã‚Â¡lida: " + value
         );
     }
 
     private BigDecimal parseMonto(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidTransactionException("El monto está vacío");
+            throw new InvalidTransactionException("El monto estÃƒÆ’Ã‚Â¡ vacÃƒÆ’Ã‚Â­o");
         }
 
         try {
@@ -105,7 +114,7 @@ public class DailyTransactionProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidTransactionException(
-                    "El monto no es numérico: " + value
+                    "El monto no es numÃƒÆ’Ã‚Â©rico: " + value
             );
         }
     }
@@ -113,7 +122,7 @@ public class DailyTransactionProcessor
     private String parseTipo(String value) {
         if (value == null || value.isBlank()) {
             throw new InvalidTransactionException(
-                    "El tipo de transacción está vacío"
+                    "El tipo de transacciÃƒÆ’Ã‚Â³n estÃƒÆ’Ã‚Â¡ vacÃƒÆ’Ã‚Â­o"
             );
         }
 
@@ -121,7 +130,7 @@ public class DailyTransactionProcessor
 
         if (!tipo.equals("debito") && !tipo.equals("credito")) {
             throw new InvalidTransactionException(
-                    "Tipo de transacción inválido: " + value
+                    "Tipo de transacciÃƒÆ’Ã‚Â³n invÃƒÆ’Ã‚Â¡lido: " + value
             );
         }
 

@@ -20,6 +20,7 @@ import org.springframework.batch.infrastructure.item.file.builder.FlatFileItemRe
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -104,7 +105,8 @@ public class MonthlyInterestJobConfig {
             PlatformTransactionManager transactionManager,
             FlatFileItemReader<RawInterest> monthlyInterestReader,
             MonthlyInterestProcessor monthlyInterestProcessor,
-            JdbcBatchItemWriter<MonthlyInterest> monthlyInterestWriter) {
+            JdbcBatchItemWriter<MonthlyInterest> monthlyInterestWriter,
+            AsyncTaskExecutor batchTaskExecutor) {
 
         return new StepBuilder("monthlyInterestStep", jobRepository)
                 .<RawInterest, MonthlyInterest>chunk(5)
@@ -112,6 +114,7 @@ public class MonthlyInterestJobConfig {
                 .processor(monthlyInterestProcessor)
                 .writer(monthlyInterestWriter)
                 .transactionManager(transactionManager)
+                .taskExecutor(batchTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidInterestException.class,

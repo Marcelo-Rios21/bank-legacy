@@ -7,6 +7,8 @@ import com.bank.bank_legacy.exception.InvalidInterestException;
 import com.bank.bank_legacy.model.MonthlyInterest;
 import com.bank.bank_legacy.model.RawInterest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,9 @@ import org.springframework.stereotype.Component;
 public class MonthlyInterestProcessor
         implements ItemProcessor<RawInterest, MonthlyInterest> {
 
+    
+    private static final Logger log =
+            LoggerFactory.getLogger(MonthlyInterestProcessor.class);
     private static final BigDecimal TASA_AHORRO =
             new BigDecimal("0.01");
 
@@ -23,6 +28,10 @@ public class MonthlyInterestProcessor
     @Override
     public MonthlyInterest process(RawInterest item) {
 
+        
+        log.info("[PARALELO] Hilo {} procesando cuenta {}",
+                Thread.currentThread().getName(),
+                item.getCuentaId());
         Long cuentaId = parseCuentaId(item.getCuentaId());
         String nombre = parseNombre(item.getNombre());
         BigDecimal saldo = parseSaldo(item.getSaldo());
@@ -55,7 +64,7 @@ public class MonthlyInterestProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidInterestException(
-                    "El id de cuenta estÃƒÂ¡ vacÃƒÂ­o");
+                    "El id de cuenta estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o");
         }
 
         try {
@@ -70,7 +79,7 @@ public class MonthlyInterestProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidInterestException(
-                    "El id de cuenta no es numÃƒÂ©rico: " + value);
+                    "El id de cuenta no es numÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rico: " + value);
         }
     }
 
@@ -78,7 +87,7 @@ public class MonthlyInterestProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidInterestException(
-                    "El nombre estÃƒÂ¡ vacÃƒÂ­o");
+                    "El nombre estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o");
         }
 
         return value.trim();
@@ -88,7 +97,7 @@ public class MonthlyInterestProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidInterestException(
-                    "El saldo estÃƒÂ¡ vacÃƒÂ­o");
+                    "El saldo estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o");
         }
 
         try {
@@ -103,7 +112,7 @@ public class MonthlyInterestProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidInterestException(
-                    "El saldo no es numÃƒÂ©rico: " + value);
+                    "El saldo no es numÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rico: " + value);
         }
     }
 
@@ -111,7 +120,7 @@ public class MonthlyInterestProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidInterestException(
-                    "La edad estÃƒÂ¡ vacÃƒÂ­a");
+                    "La edad estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a");
         }
 
         try {
@@ -126,7 +135,7 @@ public class MonthlyInterestProcessor
 
         } catch (NumberFormatException e) {
             throw new InvalidInterestException(
-                    "La edad no es numÃƒÂ©rica: " + value);
+                    "La edad no es numÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rica: " + value);
         }
     }
 
@@ -134,7 +143,7 @@ public class MonthlyInterestProcessor
 
         if (value == null || value.isBlank()) {
             throw new InvalidInterestException(
-                    "El tipo de cuenta estÃƒÂ¡ vacÃƒÂ­o");
+                    "El tipo de cuenta estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o");
         }
 
         String tipo = value.trim().toLowerCase();
@@ -143,7 +152,7 @@ public class MonthlyInterestProcessor
                 !tipo.equals("prestamo")) {
 
             throw new InvalidInterestException(
-                    "Tipo de cuenta invÃƒÂ¡lido: " + value);
+                    "Tipo de cuenta invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido: " + value);
         }
 
         return tipo;

@@ -22,6 +22,7 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -83,7 +84,8 @@ public class DailyTransactionJobConfig {
             PlatformTransactionManager transactionManager,
             FlatFileItemReader<RawTransaction> dailyTransactionReader,
             DailyTransactionProcessor dailyTransactionProcessor,
-            JdbcBatchItemWriter<DailyTransaction> dailyTransactionWriter) {
+            JdbcBatchItemWriter<DailyTransaction> dailyTransactionWriter,
+            AsyncTaskExecutor batchTaskExecutor) {
 
         return new StepBuilder("dailyTransactionStep", jobRepository)
                 .<RawTransaction, DailyTransaction>chunk(5)
@@ -91,6 +93,7 @@ public class DailyTransactionJobConfig {
                 .processor(dailyTransactionProcessor)
                 .writer(dailyTransactionWriter)
                 .transactionManager(transactionManager)
+                .taskExecutor(batchTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidTransactionException.class,
