@@ -29,7 +29,7 @@ https://github.com/KariVillagran/bank_legacy_data
 La aplicación actualmente procesa los archivos ubicados en:
 
 ```text
-data/semana_1/
+data/semana_2/
 ├── transacciones.csv
 ├── intereses.csv
 └── cuentas_anuales.csv
@@ -87,7 +87,7 @@ Cuando un registro contiene datos inválidos, se lanza una excepción específic
 El Job `dailyTransactionJob` procesa:
 
 ```text
-data/semana_1/transacciones.csv
+data/semana_2/transacciones.csv
 ```
 
 Los registros contienen:
@@ -115,12 +115,12 @@ DAILY_TRANSACTION
 
 El Writer utiliza `MERGE`, permitiendo ejecutar nuevamente el Job sin duplicar registros por ID.
 
-La ejecución actual con los datos de semana 1 obtiene:
+La ejecución actual con los datos de semana 2 obtiene:
 
 ```text
 Registros leídos:      10
-Registros persistidos: 8
-Registros inválidos:   2
+Registros persistidos: 7
+Registros inválidos:   3
 ```
 
 El Job también genera un resumen con la cantidad de registros recibidos, registros válidos, registros omitidos y posibles duplicados.
@@ -130,8 +130,8 @@ Resultado actual:
 ```text
 ===== RESUMEN TRANSACCIONES DIARIAS =====
 Total recibidas: 10
-Validas persistidas: 8
-Invalidas omitidas: 2
+Validas persistidas: 7
+Invalidas omitidas: 3
 Posibles duplicados: 1 grupo(s), 2 registro(s)
 ==========================================
 ```
@@ -143,7 +143,7 @@ Posibles duplicados: 1 grupo(s), 2 registro(s)
 El Job `monthlyInterestJob` procesa:
 
 ```text
-data/semana_1/intereses.csv
+data/semana_2/intereses.csv
 ```
 
 Los registros contienen:
@@ -196,8 +196,8 @@ La ejecución actual obtiene:
 
 ```text
 Registros leídos:      8
-Registros persistidos: 7
-Registros inválidos:   1
+Registros persistidos: 5
+Registros inválidos:   3
 ```
 
 ---
@@ -207,7 +207,7 @@ Registros inválidos:   1
 El Job `annualAccountJob` procesa:
 
 ```text
-data/semana_1/cuentas_anuales.csv
+data/semana_2/cuentas_anuales.csv
 ```
 
 El proceso está compuesto por tres Steps:
@@ -267,9 +267,9 @@ La ejecución actual obtiene:
 
 ```text
 Registros leídos:      9
-Registros persistidos: 9
-Registros inválidos:   0
-Cuentas distintas:     8
+Registros persistidos: 8
+Registros inválidos:   1
+Cuentas distintas:     7
 ```
 
 #### annualAccountAuditStep
@@ -307,7 +307,7 @@ Pagos: 0
 
 Movimientos con monto cero: 1
 Movimientos con monto negativo: 2
-Balance neto de movimientos: 11400
+Balance neto de movimientos: 9400
 ======================================
 ```
 
@@ -414,38 +414,90 @@ Remove-Item Env:SPRING_BATCH_JOB_NAME
 
 ---
 
-## Manejo de errores
+## Manejo de errores y tolerancia a fallos
 
-Los tres Jobs utilizan procesamiento tolerante a fallos mediante:
+Los tres Jobs utilizan procesamiento tolerante a fallos mediante una política personalizada llamada `BankDataSkipPolicy`.
+
+Cada Step principal configura:
 
 ```java
 .faultTolerant()
-.skip(ExcepcionDelProceso.class)
-.skipLimit(10)
+.skipPolicy(new BankDataSkipPolicy(
+        ExcepcionDelProceso.class,
+        10))
 ```
 
-Cada proceso utiliza su propia excepción:
+La política permite omitir solamente errores de datos conocidos mientras no se alcance el límite configurado. Una excepción no contemplada no es omitida y provoca el fallo del Step.
+
+Cada proceso mantiene su propia excepción de validación:
 
 - `InvalidTransactionException`
 - `InvalidInterestException`
 - `InvalidAnnualAccountException`
 
-Los errores de validación utilizan `skip` porque volver a intentar procesar un registro cuyo contenido es inválido no modifica los datos originales del CSV.
+Los errores de validación se omiten porque volver a procesar un registro cuyo contenido es inválido no modifica los datos originales del CSV.
 
+La política personalizada fue validada mediante pruebas que comprueban:
+
+- Error conocido bajo el límite: puede ser omitido.
+- Error no configurado: no puede ser omitido.
+- Límite de omisiones alcanzado: el error deja de ser tolerado.
+
+## Escalamiento y procesamiento paralelo
+
+Los tres Steps principales procesan los datos mediante chunks de tamaño 5:
+
+```java
+.chunk(5)
+```
+
+El proyecto utiliza un `ThreadPoolTaskExecutor` compartido con exactamente tres hilos de ejecución:
+
+```java
+executor.setCorePoolSize(3);
+executor.setMaxPoolSize(3);
+executor.setThreadNamePrefix("batch-worker-");
+executor.setDaemon(true);
+```
+
+Los Steps principales utilizan:
+
+```java
+.taskExecutor(batchTaskExecutor)
+```
+
+Durante las ejecuciones se verificó el procesamiento concurrente mediante:
+
+```text
+batch-worker-1
+batch-worker-2
+batch-worker-3
+```
+
+En `annualAccountJob`, solamente `annualAccountStep` utiliza procesamiento paralelo. Los Steps `annualAccountCleanupStep` y `annualAccountAuditStep` permanecen secuenciales porque realizan tareas únicas de preparación y auditoría.
+
+Spring Batch registra los tiempos de ejecución de cada Step. En una de las validaciones realizadas se obtuvieron:
+
+```text
+annualAccountStep       175 ms
+dailyTransactionStep    301 ms
+monthlyInterestStep     228 ms
+```
+
+Debido al reducido número de registros de los archivos de prueba, estos tiempos no permiten concluir una mejora porcentual significativa de rendimiento. La validación demuestra que la estrategia de escalamiento utiliza tres hilos y mantiene la consistencia de los resultados.
 ---
 
 ## Pruebas
 
-El proyecto contiene pruebas unitarias para los tres `ItemProcessor`.
+El proyecto contiene pruebas para los tres `ItemProcessor`, la política personalizada de tolerancia a fallos y la carga del contexto de Spring.
 
-Actualmente existen pruebas para:
+Actualmente existen:
 
-- Procesamiento correcto de una transacción.
-- Rechazo de un monto inválido.
-- Cálculo correcto del interés mensual.
-- Rechazo de un tipo de cuenta inválido.
-- Aceptación de montos negativos en movimientos anuales.
-- Rechazo de una descripción vacía.
+- 2 pruebas para `DailyTransactionProcessor`.
+- 2 pruebas para `MonthlyInterestProcessor`.
+- 2 pruebas para `AnnualAccountProcessor`.
+- 3 pruebas para `BankDataSkipPolicy`.
+- 1 prueba de carga del contexto con `BankLegacyApplicationTests`.
 
 Para ejecutar solamente las pruebas de los Processors:
 
@@ -453,26 +505,22 @@ Para ejecutar solamente las pruebas de los Processors:
 .\mvnw.cmd test "-Dtest=*ProcessorTest"
 ```
 
-Actualmente las seis pruebas finalizan correctamente:
-
-```text
-Tests run: 6
-Failures: 0
-Errors: 0
-```
-
-La suite completa se ejecuta mediante:
+Para ejecutar toda la suite:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-Actualmente la suite completa finaliza con:
+La suite completa finaliza actualmente con:
 
 ```text
+Tests run: 10
+Failures: 0
+Errors: 0
+Skipped: 0
+
 BUILD SUCCESS
 ```
-
 ---
 
 ## Estado actual
