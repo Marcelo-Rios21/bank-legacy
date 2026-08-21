@@ -3,6 +3,7 @@ package com.bank.bank_legacy.job;
 import javax.sql.DataSource;
 
 import com.bank.bank_legacy.exception.InvalidInterestException;
+import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.model.MonthlyInterest;
 import com.bank.bank_legacy.model.RawInterest;
 import com.bank.bank_legacy.processor.MonthlyInterestProcessor;
@@ -30,7 +31,7 @@ public class MonthlyInterestJobConfig {
         return new FlatFileItemReaderBuilder<RawInterest>()
                 .name("monthlyInterestReader")
                 .resource(new FileSystemResource(
-                        "data/semana_1/intereses.csv"))
+                        "data/semana_2/intereses.csv"))
                 .linesToSkip(1)
                 .delimited(delimited -> delimited
                         .delimiter(",")
@@ -112,8 +113,9 @@ public class MonthlyInterestJobConfig {
                 .writer(monthlyInterestWriter)
                 .transactionManager(transactionManager)
                 .faultTolerant()
-                .skip(InvalidInterestException.class)
-                .skipLimit(10)
+                .skipPolicy(new BankDataSkipPolicy(
+                        InvalidInterestException.class,
+                        10))
                 .build();
     }
 

@@ -3,6 +3,7 @@ package com.bank.bank_legacy.job;
 import javax.sql.DataSource;
 
 import com.bank.bank_legacy.exception.InvalidTransactionException;
+import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.model.DailyTransaction;
 import com.bank.bank_legacy.model.RawTransaction;
 import com.bank.bank_legacy.processor.DailyTransactionProcessor;
@@ -32,7 +33,7 @@ public class DailyTransactionJobConfig {
 
         return new FlatFileItemReaderBuilder<RawTransaction>()
                 .name("dailyTransactionReader")
-                .resource(new FileSystemResource("data/semana_1/transacciones.csv"))
+                .resource(new FileSystemResource("data/semana_2/transacciones.csv"))
                 .linesToSkip(1)
                 .delimited(delimited -> delimited
                         .delimiter(",")
@@ -91,8 +92,9 @@ public class DailyTransactionJobConfig {
                 .writer(dailyTransactionWriter)
                 .transactionManager(transactionManager)
                 .faultTolerant()
-                .skip(InvalidTransactionException.class)
-                .skipLimit(10)
+                .skipPolicy(new BankDataSkipPolicy(
+                        InvalidTransactionException.class,
+                        10))
                 .build();
     }
 

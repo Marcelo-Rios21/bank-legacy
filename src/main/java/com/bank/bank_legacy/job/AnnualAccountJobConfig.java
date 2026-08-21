@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import javax.sql.DataSource;
 
 import com.bank.bank_legacy.exception.InvalidAnnualAccountException;
+import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.model.AnnualAccountEntry;
 import com.bank.bank_legacy.model.RawAnnualAccount;
 import com.bank.bank_legacy.processor.AnnualAccountProcessor;
@@ -38,7 +39,7 @@ public class AnnualAccountJobConfig {
         return new FlatFileItemReaderBuilder<RawAnnualAccount>()
                 .name("annualAccountReader")
                 .resource(new FileSystemResource(
-                        "data/semana_1/cuentas_anuales.csv"))
+                        "data/semana_2/cuentas_anuales.csv"))
                 .linesToSkip(1)
                 .delimited(delimited -> delimited
                         .delimiter(",")
@@ -120,8 +121,9 @@ public class AnnualAccountJobConfig {
                 .writer(annualAccountWriter)
                 .transactionManager(transactionManager)
                 .faultTolerant()
-                .skip(InvalidAnnualAccountException.class)
-                .skipLimit(10)
+                .skipPolicy(new BankDataSkipPolicy(
+                        InvalidAnnualAccountException.class,
+                        10))
                 .build();
     }
 
