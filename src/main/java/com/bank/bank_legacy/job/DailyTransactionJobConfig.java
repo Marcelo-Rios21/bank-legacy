@@ -8,6 +8,7 @@ import com.bank.bank_legacy.model.RawTransaction;
 import com.bank.bank_legacy.partition.CsvRangePartitioner;
 import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.processor.DailyTransactionProcessor;
+import com.bank.bank_legacy.writer.TransientFailureItemWriter;
 
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
@@ -17,6 +18,7 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
@@ -28,6 +30,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.retry.RetryPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -108,6 +111,17 @@ public class DailyTransactionJobConfig {
     }
 
     @Bean
+    public ItemWriter<DailyTransaction> dailyTransactionRetryWriter(
+            @Qualifier("dailyTransactionWriter")
+            JdbcBatchItemWriter<DailyTransaction> delegate,
+            @Value("${batch.fault-tolerance.simulate-transient-failure:false}")
+            boolean simulateTransientFailure) {
+
+        return new TransientFailureItemWriter<>(
+                delegate,
+                simulateTransientFailure);
+    }
+    @Bean
     public Step dailyTransactionCleanupStep(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
@@ -142,12 +156,14 @@ public class DailyTransactionJobConfig {
             @Qualifier("dailyTransactionReader")
             FlatFileItemReader<RawTransaction> dailyTransactionReader,
             DailyTransactionProcessor dailyTransactionProcessor,
-            @Qualifier("dailyTransactionWriter")
-            JdbcBatchItemWriter<DailyTransaction> dailyTransactionWriter,
+            @Qualifier("dailyTransactionRetryWriter")
+            ItemWriter<DailyTransaction> dailyTransactionRetryWriter,
             @Value("${batch.scaling.chunk-size:25}")
             int chunkSize,
             @Value("${batch.fault-tolerance.max-skips:1000}")
-            long maxSkips) {
+            long maxSkips,
+            @Qualifier("bankRetryPolicy")
+            RetryPolicy bankRetryPolicy) {
 
         return new StepBuilder(
                 "dailyTransactionWorkerStep",
@@ -155,9 +171,10 @@ public class DailyTransactionJobConfig {
                 .<RawTransaction, DailyTransaction>chunk(chunkSize)
                 .reader(dailyTransactionReader)
                 .processor(dailyTransactionProcessor)
-                .writer(dailyTransactionWriter)
+                .writer(dailyTransactionRetryWriter)
                 .transactionManager(transactionManager)
                 .faultTolerant()
+                .retryPolicy(bankRetryPolicy)
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidTransactionException.class,
                         maxSkips))

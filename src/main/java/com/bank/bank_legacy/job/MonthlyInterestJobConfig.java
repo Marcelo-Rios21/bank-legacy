@@ -29,6 +29,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.retry.RetryPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -167,7 +168,9 @@ public class MonthlyInterestJobConfig {
             @Value("${batch.scaling.chunk-size:25}")
             int chunkSize,
             @Value("${batch.fault-tolerance.max-skips:1000}")
-            long maxSkips) {
+            long maxSkips,
+            @Qualifier("bankRetryPolicy")
+            RetryPolicy bankRetryPolicy) {
 
         return new StepBuilder(
                 "monthlyInterestWorkerStep",
@@ -178,6 +181,7 @@ public class MonthlyInterestJobConfig {
                 .writer(monthlyInterestWriter)
                 .transactionManager(transactionManager)
                 .faultTolerant()
+                .retryPolicy(bankRetryPolicy)
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidInterestException.class,
                         maxSkips))
