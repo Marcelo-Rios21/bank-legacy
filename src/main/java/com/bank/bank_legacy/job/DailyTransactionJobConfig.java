@@ -8,6 +8,7 @@ import com.bank.bank_legacy.model.RawTransaction;
 import com.bank.bank_legacy.partition.CsvRangePartitioner;
 import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.processor.DailyTransactionProcessor;
+import com.bank.bank_legacy.processor.RestartFailureTransactionProcessor;
 import com.bank.bank_legacy.writer.TransientFailureItemWriter;
 
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -18,6 +19,7 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchItemWriterBuilder;
@@ -69,6 +71,19 @@ public class DailyTransactionJobConfig {
                 .build();
     }
 
+    @Bean
+    public ItemProcessor<RawTransaction, DailyTransaction> dailyTransactionRestartProcessor(
+            DailyTransactionProcessor delegate,
+            @Value("${batch.restart-demo.enabled:false}")
+            boolean restartDemoEnabled,
+            @Value("${batch.restart-demo.fail-on-id:600}")
+            long failOnId) {
+
+        return new RestartFailureTransactionProcessor(
+                delegate,
+                restartDemoEnabled,
+                failOnId);
+    }
     @Bean
     public JdbcBatchItemWriter<DailyTransaction> dailyTransactionWriter(
             DataSource dataSource) {
@@ -155,7 +170,8 @@ public class DailyTransactionJobConfig {
             PlatformTransactionManager transactionManager,
             @Qualifier("dailyTransactionReader")
             FlatFileItemReader<RawTransaction> dailyTransactionReader,
-            DailyTransactionProcessor dailyTransactionProcessor,
+            @Qualifier("dailyTransactionRestartProcessor")
+            ItemProcessor<RawTransaction, DailyTransaction> dailyTransactionProcessor,
             @Qualifier("dailyTransactionRetryWriter")
             ItemWriter<DailyTransaction> dailyTransactionRetryWriter,
             @Value("${batch.scaling.chunk-size:25}")
