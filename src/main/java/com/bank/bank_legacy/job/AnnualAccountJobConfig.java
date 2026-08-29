@@ -8,13 +8,16 @@ import java.nio.file.Path;
 import javax.sql.DataSource;
 
 import com.bank.bank_legacy.exception.InvalidAnnualAccountException;
-import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.model.AnnualAccountEntry;
 import com.bank.bank_legacy.model.RawAnnualAccount;
+import com.bank.bank_legacy.partition.CsvRangePartitioner;
+import com.bank.bank_legacy.policy.BankDataSkipPolicy;
 import com.bank.bank_legacy.processor.AnnualAccountProcessor;
 
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.partition.Partitioner;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.StepExecution;
@@ -24,6 +27,8 @@ import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchI
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
 import org.springframework.batch.infrastructure.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
@@ -35,13 +40,29 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class AnnualAccountJobConfig {
 
     @Bean
-    public FlatFileItemReader<RawAnnualAccount> annualAccountReader() {
+    public Partitioner annualAccountPartitioner(
+            @Value("${batch.input.total-items:1000}") int totalItems) {
+
+        return new CsvRangePartitioner(totalItems);
+    }
+
+    @Bean
+    @StepScope
+    public FlatFileItemReader<RawAnnualAccount> annualAccountReader(
+            @Value("#{stepExecutionContext['startItem']}")
+            Integer startItem,
+            @Value("#{stepExecutionContext['endItem']}")
+            Integer endItem,
+            @Value("#{stepExecutionContext['partitionNumber']}")
+            Integer partitionNumber) {
 
         return new FlatFileItemReaderBuilder<RawAnnualAccount>()
-                .name("annualAccountReader")
+                .name("annualAccountReader-" + partitionNumber)
                 .resource(new FileSystemResource(
-                        "data/semana_2/cuentas_anuales.csv"))
+                        "data/semana_3/cuentas_anuales.csv"))
                 .linesToSkip(1)
+                .currentItemCount(startItem)
+                .maxItemCount(endItem)
                 .delimited(delimited -> delimited
                         .delimiter(",")
                         .names(
@@ -87,7 +108,8 @@ public class AnnualAccountJobConfig {
             PlatformTransactionManager transactionManager,
             DataSource dataSource) {
 
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        JdbcTemplate jdbcTemplate =
+                new JdbcTemplate(dataSource);
 
         return new StepBuilder(
                 "annualAccountCleanupStep",
@@ -99,7 +121,8 @@ public class AnnualAccountJobConfig {
 
                     System.out.println(
                             "Carga anual anterior eliminada: "
-                                    + eliminados + " registro(s)");
+                                    + eliminados
+                                    + " registro(s)");
 
                     return RepeatStatus.FINISHED;
 
@@ -108,25 +131,55 @@ public class AnnualAccountJobConfig {
     }
 
     @Bean
-    public Step annualAccountStep(
+    public Step annualAccountWorkerStep(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
+            @Qualifier("annualAccountReader")
             FlatFileItemReader<RawAnnualAccount> annualAccountReader,
             AnnualAccountProcessor annualAccountProcessor,
+            @Qualifier("annualAccountWriter")
             JdbcBatchItemWriter<AnnualAccountEntry> annualAccountWriter,
-            AsyncTaskExecutor batchTaskExecutor) {
+            @Value("${batch.scaling.chunk-size:25}")
+            int chunkSize,
+            @Value("${batch.fault-tolerance.max-skips:1000}")
+            long maxSkips) {
 
-        return new StepBuilder("annualAccountStep", jobRepository)
-                .<RawAnnualAccount, AnnualAccountEntry>chunk(5)
+        return new StepBuilder(
+                "annualAccountWorkerStep",
+                jobRepository)
+                .<RawAnnualAccount, AnnualAccountEntry>chunk(chunkSize)
                 .reader(annualAccountReader)
                 .processor(annualAccountProcessor)
                 .writer(annualAccountWriter)
                 .transactionManager(transactionManager)
-                .taskExecutor(batchTaskExecutor)
                 .faultTolerant()
                 .skipPolicy(new BankDataSkipPolicy(
                         InvalidAnnualAccountException.class,
-                        10))
+                        maxSkips))
+                .build();
+    }
+
+    @Bean
+    public Step annualAccountStep(
+            JobRepository jobRepository,
+            @Qualifier("annualAccountWorkerStep")
+            Step annualAccountWorkerStep,
+            @Qualifier("annualAccountPartitioner")
+            Partitioner annualAccountPartitioner,
+            @Qualifier("batchTaskExecutor")
+            AsyncTaskExecutor batchTaskExecutor,
+            @Value("${batch.scaling.grid-size:4}")
+            int gridSize) {
+
+        return new StepBuilder(
+                "annualAccountStep",
+                jobRepository)
+                .partitioner(
+                        "annualAccountWorkerStep",
+                        annualAccountPartitioner)
+                .step(annualAccountWorkerStep)
+                .gridSize(gridSize)
+                .taskExecutor(batchTaskExecutor)
                 .build();
     }
 
@@ -136,7 +189,8 @@ public class AnnualAccountJobConfig {
             PlatformTransactionManager transactionManager,
             DataSource dataSource) {
 
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        JdbcTemplate jdbcTemplate =
+                new JdbcTemplate(dataSource);
 
         return new StepBuilder(
                 "annualAccountAuditStep",
@@ -253,8 +307,11 @@ public class AnnualAccountJobConfig {
                     System.out.println();
                     System.out.println(reporte);
 
-                    Path outputDirectory = Path.of("output");
-                    Files.createDirectories(outputDirectory);
+                    Path outputDirectory =
+                            Path.of("output");
+
+                    Files.createDirectories(
+                            outputDirectory);
 
                     Files.writeString(
                             outputDirectory.resolve(
@@ -271,11 +328,16 @@ public class AnnualAccountJobConfig {
     @Bean
     public Job annualAccountJob(
             JobRepository jobRepository,
+            @Qualifier("annualAccountCleanupStep")
             Step annualAccountCleanupStep,
+            @Qualifier("annualAccountStep")
             Step annualAccountStep,
+            @Qualifier("annualAccountAuditStep")
             Step annualAccountAuditStep) {
 
-        return new JobBuilder("annualAccountJob", jobRepository)
+        return new JobBuilder(
+                "annualAccountJob",
+                jobRepository)
                 .start(annualAccountCleanupStep)
                 .next(annualAccountStep)
                 .next(annualAccountAuditStep)
