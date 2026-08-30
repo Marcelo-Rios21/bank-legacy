@@ -1,17 +1,17 @@
 ===== REPORTE DE AUDITORIA ANUAL =====
-Periodo: 2024-01-01 a 2024-12-31
+Periodo: 2024-01-02 a 2024-12-29
 
-Registros leidos: 9
-Registros persistidos: 8
-Registros invalidos omitidos: 1
-Cuentas distintas: 7
+Registros leidos: 1000
+Registros persistidos: 732
+Registros invalidos omitidos: 268
+Cuentas distintas: 20
 
-Depositos: 6
-Retiros: 1
-Compras: 1
-Pagos: 0
+Depositos: 262
+Retiros: 205
+Compras: 232
+Pagos: 33
 
-Movimientos con monto cero: 1
-Movimientos con monto negativo: 2
-Balance neto de movimientos: 9400
+Movimientos con monto cero: 9
+Movimientos con monto negativo: 199
+Balance neto de movimientos: 1048600
 ======================================

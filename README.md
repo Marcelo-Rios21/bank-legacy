@@ -591,9 +591,9 @@ Se compararon tres configuraciones utilizando `dailyTransactionJob`:
 
 | Configuración | Particiones | Hilos | Chunk | Tiempo Step | Tiempo Job |
 |---|---:|---:|---:|---:|---:|
-| A | 2 | 2 | 50 | 3.183 s | 4.038 s |
-| B | 4 | 4 | 25 | 3.153 s | 3.978 s |
-| C | 8 | 4 | 25 | 3.679 s | 4.486 s |
+| A | 2 | 2 | 50 | 3.118 s | 3.950 s |
+| B | 4 | 4 | 25 | 3.157 s | 3.973 s |
+| C | 8 | 4 | 25 | 3.861 s | 4.676 s |
 
 Las tres ejecuciones conservaron:
 
@@ -604,7 +604,7 @@ Invalidas omitidas: 599
 Estado: COMPLETED
 ```
 
-La configuración B obtuvo el menor tiempo en las pruebas realizadas:
+La configuración A obtuvo el menor tiempo en la medición final, aunque A y B presentaron tiempos muy similares:
 
 ```text
 4 particiones
