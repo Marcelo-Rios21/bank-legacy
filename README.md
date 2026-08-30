@@ -604,17 +604,11 @@ Invalidas omitidas: 599
 Estado: COMPLETED
 ```
 
-La configuración A obtuvo el menor tiempo en la medición final, aunque A y B presentaron tiempos muy similares:
-
-```text
-4 particiones
-4 hilos
-chunk 25
-```
+La configuración A obtuvo el menor tiempo en la medición final, aunque A y B presentaron tiempos muy similares. La diferencia entre ambas fue mínima para este volumen de datos.
 
 La configuración C muestra que aumentar la cantidad de particiones no garantiza un mejor rendimiento, ya que también aumenta el costo de coordinación.
 
-Por este motivo se mantiene como configuración normal:
+Se mantiene B como configuración normal por ofrecer mayor paralelismo con un tiempo prácticamente equivalente a A en estas pruebas:
 
 ```properties
 batch.scaling.grid-size=4
