@@ -1,4 +1,4 @@
-﻿# Bank Legacy
+# Bank Legacy
 
 Proyecto desarrollado con **Spring Batch** para procesar información legacy del Banco XYZ almacenada en archivos CSV.
 
@@ -29,7 +29,7 @@ https://github.com/KariVillagran/bank_legacy_data
 La aplicación actualmente procesa los archivos ubicados en:
 
 ```text
-data/semana_2/
+data/semana_3/
 ├── transacciones.csv
 ├── intereses.csv
 └── cuentas_anuales.csv
@@ -41,10 +41,15 @@ data/semana_2/
 src/
 ├── main/
 │   ├── java/com/bank/bank_legacy/
+│   │   ├── config/
 │   │   ├── exception/
 │   │   ├── job/
 │   │   ├── model/
+│   │   ├── partition/
+│   │   ├── policy/
 │   │   ├── processor/
+│   │   ├── reader/
+│   │   ├── writer/
 │   │   └── BankLegacyApplication.java
 │   └── resources/
 │       ├── application.properties
@@ -52,12 +57,13 @@ src/
 └── test/
     └── java/com/bank/bank_legacy/
         ├── BankLegacyApplicationTests.java
+        ├── policy/
+        │   └── BankDataSkipPolicyTest.java
         └── processor/
             ├── AnnualAccountProcessorTest.java
             ├── DailyTransactionProcessorTest.java
             └── MonthlyInterestProcessorTest.java
 ```
-
 ## Flujo de procesamiento
 
 Los procesos batch utilizan principalmente el siguiente flujo:
@@ -87,7 +93,7 @@ Cuando un registro contiene datos inválidos, se lanza una excepción específic
 El Job `dailyTransactionJob` procesa:
 
 ```text
-data/semana_2/transacciones.csv
+data/semana_3/transacciones.csv
 ```
 
 Los registros contienen:
@@ -115,12 +121,13 @@ DAILY_TRANSACTION
 
 El Writer utiliza `MERGE`, permitiendo ejecutar nuevamente el Job sin duplicar registros por ID.
 
-La ejecución actual con los datos de semana 2 obtiene:
+La ejecución actual con los datos de semana 3 obtiene:
 
 ```text
-Registros leídos:      10
-Registros persistidos: 7
-Registros inválidos:   3
+Registros leídos:      1000
+Registros persistidos: 401
+Registros inválidos:   599
+Filas finales Oracle:  401
 ```
 
 El Job también genera un resumen con la cantidad de registros recibidos, registros válidos, registros omitidos y posibles duplicados.
@@ -129,10 +136,10 @@ Resultado actual:
 
 ```text
 ===== RESUMEN TRANSACCIONES DIARIAS =====
-Total recibidas: 10
-Validas persistidas: 7
-Invalidas omitidas: 3
-Posibles duplicados: 1 grupo(s), 2 registro(s)
+Total recibidas: 1000
+Validas persistidas: 401
+Invalidas omitidas: 599
+Posibles duplicados: 14 grupo(s), 28 registro(s)
 ==========================================
 ```
 
@@ -143,7 +150,7 @@ Posibles duplicados: 1 grupo(s), 2 registro(s)
 El Job `monthlyInterestJob` procesa:
 
 ```text
-data/semana_2/intereses.csv
+data/semana_3/intereses.csv
 ```
 
 Los registros contienen:
@@ -195,10 +202,13 @@ El Writer utiliza `MERGE`, por lo que una nueva ejecución actualiza la cuenta e
 La ejecución actual obtiene:
 
 ```text
-Registros leídos:      8
-Registros persistidos: 5
-Registros inválidos:   3
+Registros leídos:       1000
+Registros persistidos:  263
+Registros inválidos:    737
+Cuentas finales Oracle: 50
 ```
+
+Los 263 registros válidos pueden corresponder varias veces a una misma cuenta. Como el Writer utiliza `MERGE` por `CUENTA_ID`, el resultado final contiene 50 cuentas distintas.
 
 ---
 
@@ -207,7 +217,7 @@ Registros inválidos:   3
 El Job `annualAccountJob` procesa:
 
 ```text
-data/semana_2/cuentas_anuales.csv
+data/semana_3/cuentas_anuales.csv
 ```
 
 El proceso está compuesto por tres Steps:
@@ -266,10 +276,11 @@ Cada movimiento posee un `MOVIMIENTO_ID` autogenerado, lo que permite almacenar 
 La ejecución actual obtiene:
 
 ```text
-Registros leídos:      9
-Registros persistidos: 8
-Registros inválidos:   1
-Cuentas distintas:     7
+Registros leídos:      1000
+Registros persistidos: 732
+Registros inválidos:   268
+Cuentas distintas:     20
+Filas finales Oracle:  732
 ```
 
 #### annualAccountAuditStep
@@ -293,21 +304,21 @@ El reporte actual es:
 
 ```text
 ===== REPORTE DE AUDITORIA ANUAL =====
-Periodo: 2024-01-01 a 2024-12-31
+Periodo: 2024-01-02 a 2024-12-29
 
-Registros leidos: 9
-Registros persistidos: 9
-Registros invalidos omitidos: 0
-Cuentas distintas: 8
+Registros leidos: 1000
+Registros persistidos: 732
+Registros invalidos omitidos: 268
+Cuentas distintas: 20
 
-Depositos: 7
-Retiros: 1
-Compras: 1
-Pagos: 0
+Depositos: 262
+Retiros: 205
+Compras: 232
+Pagos: 33
 
-Movimientos con monto cero: 1
-Movimientos con monto negativo: 2
-Balance neto de movimientos: 9400
+Movimientos con monto cero: 9
+Movimientos con monto negativo: 199
+Balance neto de movimientos: 1048600
 ======================================
 ```
 
@@ -418,13 +429,20 @@ Remove-Item Env:SPRING_BATCH_JOB_NAME
 
 Los tres Jobs utilizan procesamiento tolerante a fallos mediante una política personalizada llamada `BankDataSkipPolicy`.
 
-Cada Step principal configura:
+Cada Worker Step configura tolerancia a fallos mediante:
 
 ```java
 .faultTolerant()
+.retryPolicy(bankRetryPolicy)
 .skipPolicy(new BankDataSkipPolicy(
         ExcepcionDelProceso.class,
-        10))
+        maxSkips))
+```
+
+El límite de omisiones se configura mediante:
+
+```properties
+batch.fault-tolerance.max-skips=1000
 ```
 
 La política permite omitir solamente errores de datos conocidos mientras no se alcance el límite configurado. Una excepción no contemplada no es omitida y provoca el fallo del Step.
@@ -443,50 +461,168 @@ La política personalizada fue validada mediante pruebas que comprueban:
 - Error no configurado: no puede ser omitido.
 - Límite de omisiones alcanzado: el error deja de ser tolerado.
 
+### Retry para fallos transitorios
+
+Los errores temporales utilizan una política de `retry` independiente del `skip`.
+
+La configuración actual es:
+
+```properties
+batch.fault-tolerance.max-retries=2
+batch.fault-tolerance.retry-delay-ms=200
+```
+
+La política considera recuperables:
+
+- `TransientBankException`
+- `SQLTransientException`
+- `TransientDataAccessException`
+
+En la prueba controlada de `dailyTransactionJob` se obtuvo:
+
+```text
+[RETRY DEMO] Fallo transitorio simulado. El chunk debe reintentarse.
+[RETRY DEMO] Reintento exitoso. El procesamiento continua.
+```
+
+El Job terminó `COMPLETED` y mantuvo:
+
+```text
+Total recibidas: 1000
+Validas persistidas: 401
+Invalidas omitidas: 599
+```
+
+Por lo tanto:
+
+```text
+Dato inválido     -> SKIP
+Fallo transitorio -> RETRY
+```
+
+### Restart y checkpoint
+
+También se validó la recuperación de una ejecución fallida.
+
+Se provocó un fallo controlado en la transacción 600, correspondiente a `partition2`.
+
+Primera ejecución:
+
+```text
+partition0 -> COMPLETED
+partition1 -> COMPLETED
+partition2 -> FAILED
+partition3 -> COMPLETED
+
+dailyTransactionJob -> FAILED
+```
+
+Luego se ejecutó nuevamente la misma JobInstance utilizando el mismo `run.id` y desactivando el fallo controlado.
+
+Spring Batch:
+
+- no volvió a ejecutar `dailyTransactionCleanupStep`;
+- no volvió a ejecutar las particiones 0, 1 y 3;
+- reanudó solamente `partition2`;
+- continuó desde el último checkpoint confirmado.
+
+En la reejecución se procesaron solamente:
+
+```text
+Registros leídos:      175
+Registros persistidos: 64
+Registros inválidos:   111
+```
+
+La segunda ejecución terminó `COMPLETED` y `DAILY_TRANSACTION` quedó con 401 filas.
+
+Esto demuestra que una partición fallida puede recuperarse sin volver a procesar todo el batch.
+
 ## Escalamiento y procesamiento paralelo
 
-Los tres Steps principales procesan los datos mediante chunks de tamaño 5:
+En Semana 3 los tres procesos principales utilizan **partitioning**.
 
-```java
-.chunk(5)
+La configuración normal es:
+
+```properties
+batch.scaling.grid-size=4
+batch.scaling.threads=4
+batch.scaling.chunk-size=25
+batch.input.total-items=1000
 ```
 
-El proyecto utiliza un `ThreadPoolTaskExecutor` compartido con exactamente tres hilos de ejecución:
+El procesamiento utiliza un `ThreadPoolTaskExecutor` compartido, cuyo número de hilos se obtiene desde `batch.scaling.threads`.
 
-```java
-executor.setCorePoolSize(3);
-executor.setMaxPoolSize(3);
-executor.setThreadNamePrefix("batch-worker-");
-executor.setDaemon(true);
-```
+### Daily y Annual
 
-Los Steps principales utilizan:
+`dailyTransactionJob` y `annualAccountJob` utilizan `CsvRangePartitioner`.
 
-```java
-.taskExecutor(batchTaskExecutor)
-```
-
-Durante las ejecuciones se verificó el procesamiento concurrente mediante:
+Con cuatro particiones y 1000 registros:
 
 ```text
-batch-worker-1
-batch-worker-2
-batch-worker-3
+partition0 -> registros 1-250
+partition1 -> registros 251-500
+partition2 -> registros 501-750
+partition3 -> registros 751-1000
 ```
 
-En `annualAccountJob`, solamente `annualAccountStep` utiliza procesamiento paralelo. Los Steps `annualAccountCleanupStep` y `annualAccountAuditStep` permanecen secuenciales porque realizan tareas únicas de preparación y auditoría.
+Cada partición ejecuta su propio Worker Step.
 
-Spring Batch registra los tiempos de ejecución de cada Step. En una de las validaciones realizadas se obtuvieron:
+### Monthly
+
+`monthlyInterestJob` utiliza `AccountRangePartitioner`.
+
+Los registros se distribuyen por `CUENTA_ID` para mantener los registros de una misma cuenta dentro de una única partición.
+
+Con cuatro particiones:
 
 ```text
-annualAccountStep       175 ms
-dailyTransactionStep    301 ms
-monthlyInterestStep     228 ms
+partition0 -> cuentas 101-113
+partition1 -> cuentas 114-126
+partition2 -> cuentas 127-138
+partition3 -> cuentas 139-150
 ```
 
-Debido al reducido número de registros de los archivos de prueba, estos tiempos no permiten concluir una mejora porcentual significativa de rendimiento. La validación demuestra que la estrategia de escalamiento utiliza tres hilos y mantiene la consistencia de los resultados.
+Esta estrategia evita condiciones de carrera al actualizar una misma clave primaria.
+
+### Comparación de configuraciones
+
+Se compararon tres configuraciones utilizando `dailyTransactionJob`:
+
+| Configuración | Particiones | Hilos | Chunk | Tiempo Step | Tiempo Job |
+|---|---:|---:|---:|---:|---:|
+| A | 2 | 2 | 50 | 3.183 s | 4.038 s |
+| B | 4 | 4 | 25 | 3.153 s | 3.978 s |
+| C | 8 | 4 | 25 | 3.679 s | 4.486 s |
+
+Las tres ejecuciones conservaron:
+
+```text
+Total recibidas: 1000
+Validas persistidas: 401
+Invalidas omitidas: 599
+Estado: COMPLETED
+```
+
+La configuración B obtuvo el menor tiempo en las pruebas realizadas:
+
+```text
+4 particiones
+4 hilos
+chunk 25
+```
+
+La configuración C muestra que aumentar la cantidad de particiones no garantiza un mejor rendimiento, ya que también aumenta el costo de coordinación.
+
+Por este motivo se mantiene como configuración normal:
+
+```properties
+batch.scaling.grid-size=4
+batch.scaling.threads=4
+batch.scaling.chunk-size=25
+```
+
 ---
-
 ## Pruebas
 
 El proyecto contiene pruebas para los tres `ItemProcessor`, la política personalizada de tolerancia a fallos y la carga del contexto de Spring.
@@ -533,4 +669,12 @@ Los tres Jobs principales se encuentran operativos:
 | `monthlyInterestJob` | `COMPLETED` |
 | `annualAccountJob` | `COMPLETED` |
 
-La aplicación actualmente lee los archivos CSV legacy, valida y transforma sus registros, maneja datos inválidos, persiste los resultados en Oracle Database y genera los reportes correspondientes.
+Resultados validados con los datos de Semana 3:
+
+| Job | Leídos | Persistidos | Omitidos | Resultado final DB |
+|---|---:|---:|---:|---:|
+| Daily | 1000 | 401 | 599 | 401 transacciones |
+| Monthly | 1000 | 263 | 737 | 50 cuentas |
+| Annual | 1000 | 732 | 268 | 732 movimientos |
+
+La aplicación actualmente lee archivos CSV legacy, valida y transforma sus registros, maneja datos inválidos mediante `skip`, reintenta fallos temporales mediante `retry`, procesa datos en paralelo mediante partitioning, recupera ejecuciones mediante restart/checkpoint, persiste los resultados en Oracle Database y genera los reportes correspondientes.
