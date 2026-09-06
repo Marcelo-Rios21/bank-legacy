@@ -617,8 +617,162 @@ batch.scaling.chunk-size=25
 ```
 
 ---
-## Pruebas
 
+## Semana 4 - Backend for Frontend
+
+Para la Semana 4 se implementó el patrón **Backend for Frontend (BFF)** con un backend independiente para cada tipo de cliente del Banco XYZ.
+
+La estrategia elegida separa las APIs según las necesidades de cada frontend:
+
+```text
+Frontend Web    -> BFF Web    -> Oracle Database
+Frontend Mobile -> BFF Mobile -> Oracle Database
+Cajero ATM      -> BFF ATM    -> Oracle Database
+```
+
+Los tres BFF se encuentran dentro de `bff/` y corresponden a aplicaciones Spring Boot independientes:
+
+```text
+bff/
+├── web/
+├── mobile/
+└── atm/
+```
+
+Cada aplicación posee su propio `pom.xml`, configuración, capa de acceso a datos, servicios, controladores y seguridad.
+
+### BFF Web
+
+El BFF Web está orientado a interfaces de escritorio que pueden consumir información más completa.
+
+Endpoints principales:
+
+```text
+GET /api/web/accounts/{cuentaId}
+GET /api/web/accounts/{cuentaId}/movements
+```
+
+El detalle de cuenta expone:
+
+- identificador de cuenta;
+- nombre;
+- saldo inicial;
+- edad;
+- tipo de cuenta;
+- interés;
+- saldo final.
+
+El historial de movimientos entrega la información completa disponible en `ANNUAL_ACCOUNT_ENTRY`.
+
+### BFF Mobile
+
+El BFF Mobile reduce el volumen de información transferida para adaptarse a dispositivos móviles.
+
+Endpoints principales:
+
+```text
+GET /api/mobile/accounts/{cuentaId}/summary
+GET /api/mobile/accounts/{cuentaId}/movements
+```
+
+El resumen de cuenta contiene solamente:
+
+- identificador de cuenta;
+- tipo;
+- saldo.
+
+Además, el historial se limita a los últimos **5 movimientos** y cada movimiento incluye únicamente:
+
+- fecha;
+- transacción;
+- monto.
+
+De esta forma, el frontend móvil recibe un payload menor que el frontend Web.
+
+### BFF ATM
+
+El BFF ATM está orientado exclusivamente a operaciones necesarias para un cajero automático.
+
+Endpoints principales:
+
+```text
+GET  /api/atm/accounts/{cuentaId}/balance
+POST /api/atm/accounts/{cuentaId}/withdrawals
+```
+
+La consulta de saldo retorna solamente:
+
+- identificador de cuenta;
+- saldo disponible.
+
+El retiro valida que:
+
+- el monto sea mayor que cero;
+- la cuenta exista;
+- exista saldo suficiente.
+
+La operación de retiro utiliza una transacción de base de datos. La cuenta se consulta mediante `SELECT ... FOR UPDATE`, se actualiza `MONTHLY_INTEREST.SALDO_FINAL` y se registra un movimiento `RETIRO_ATM` en `ANNUAL_ACCOUNT_ENTRY`.
+
+El movimiento se almacena con monto negativo para representar el débito.
+
+Si alguna operación falla, la transacción completa se revierte.
+
+### Seguridad por canal
+
+Cada BFF utiliza Spring Security con autenticación HTTP Basic y sesiones `STATELESS`.
+
+Los accesos están separados por canal:
+
+| BFF | Rol | Ruta protegida |
+|---|---|---|
+| Web | `ROLE_WEB` | `/api/web/**` |
+| Mobile | `ROLE_MOBILE` | `/api/mobile/**` |
+| ATM | `ROLE_ATM` | `/api/atm/**` |
+
+Las credenciales no se almacenan en el repositorio. Se obtienen mediante variables de entorno:
+
+```text
+BFF_WEB_USERNAME
+BFF_WEB_PASSWORD
+
+BFF_MOBILE_USERNAME
+BFF_MOBILE_PASSWORD
+
+BFF_ATM_USERNAME
+BFF_ATM_PASSWORD
+```
+
+Los tests de seguridad verifican solicitudes sin credenciales, credenciales incorrectas y acceso autorizado con las credenciales correspondientes al canal.
+
+### Diferencias entre los BFF
+
+| Característica | Web | Mobile | ATM |
+|---|---|---|---|
+| Detalle de cuenta | Completo | Reducido | Solo saldo |
+| Campos principales | 7 | 3 | 2 |
+| Movimientos | Historial completo | Últimos 5 | Solo registra retiros |
+| Operaciones críticas | No | No | Retiro |
+| Seguridad | `ROLE_WEB` | `ROLE_MOBILE` | `ROLE_ATM` |
+
+Esta separación permite adaptar cantidad de datos, operaciones y controles de seguridad a las necesidades específicas de cada frontend.
+
+### Consideraciones del patrón BFF
+
+El patrón BFF permite reducir lógica específica del canal en los clientes, disminuir información innecesaria y evolucionar las APIs de Web, Mobile y ATM de manera independiente.
+
+No obstante, introduce más aplicaciones que mantener y puede generar duplicación si la lógica de negocio se implementa directamente en varios BFF. Por esta razón, resulta especialmente útil cuando los frontends poseen necesidades claramente diferentes.
+
+En comparación con Web, un cliente Mobile suele beneficiarse de respuestas más pequeñas por sus restricciones de ancho de banda, latencia, tamaño de pantalla y recursos del dispositivo. El cliente Web puede recibir información más completa para interfaces con mayor cantidad de datos y funcionalidades.
+
+La personalización por canal también mejora el rendimiento y la experiencia de usuario al evitar transferir información innecesaria y reducir el procesamiento requerido por cada frontend. En este proyecto esto se observa directamente en la diferencia entre el detalle completo de Web, el resumen limitado de Mobile y la respuesta mínima del ATM.
+
+### Evidencias Semana 4
+
+Las evidencias de ejecución, personalización por canal, estructura de los tres BFF y resultados de las pruebas se encuentran en:
+
+[`evidencias/semana_4/`](evidencias/semana_4/README.md)
+
+## Pruebas
 El proyecto contiene pruebas para los tres `ItemProcessor`, la política personalizada de tolerancia a fallos y la carga del contexto de Spring.
 
 Actualmente existen:
@@ -641,7 +795,7 @@ Para ejecutar toda la suite:
 .\mvnw.cmd test
 ```
 
-La suite completa finaliza actualmente con:
+La suite principal del proyecto Batch finaliza actualmente con:
 
 ```text
 Tests run: 10
@@ -653,8 +807,24 @@ BUILD SUCCESS
 ```
 ---
 
-## Estado actual
 
+### Validación global Semana 4
+
+Además de los 10 tests existentes del procesamiento Batch, los tres BFF poseen pruebas de integración para acceso a datos, endpoints y seguridad.
+
+Resultados finales:
+
+| Módulo | Tests | Fallos | Errores | Omitidos |
+|---|---:|---:|---:|---:|
+| Batch S1-S3 | 10 | 0 | 0 | 0 |
+| BFF Web | 9 | 0 | 0 | 0 |
+| BFF Mobile | 9 | 0 | 0 | 0 |
+| BFF ATM | 10 | 0 | 0 | 0 |
+| **Total** | **38** | **0** | **0** | **0** |
+
+La validación global confirma que la incorporación de los BFF no rompe las funcionalidades Batch desarrolladas durante las semanas anteriores.
+
+## Estado actual
 Los tres Jobs principales se encuentran operativos:
 
 | Job | Estado |
@@ -662,6 +832,17 @@ Los tres Jobs principales se encuentran operativos:
 | `dailyTransactionJob` | `COMPLETED` |
 | `monthlyInterestJob` | `COMPLETED` |
 | `annualAccountJob` | `COMPLETED` |
+
+
+### Estado de los BFF
+
+| Backend | Puerto | Estado |
+|---|---:|---|
+| BFF Web | 8081 | Operativo |
+| BFF Mobile | 8082 | Operativo |
+| BFF ATM | 8083 | Operativo |
+
+Los tres backends utilizan la misma base Oracle, pero exponen APIs, DTOs y reglas específicas para su respectivo frontend.
 
 Resultados validados con los datos de Semana 3:
 
