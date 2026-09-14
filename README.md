@@ -618,11 +618,11 @@ batch.scaling.chunk-size=25
 
 ---
 
-## Semana 4 - Backend for Frontend
+## Backend for Frontend (BFF)
 
-Para la Semana 4 se implementó el patrón **Backend for Frontend (BFF)** con un backend independiente para cada tipo de cliente del Banco XYZ.
+El sistema implementa el patrón **Backend for Frontend (BFF)** mediante un backend independiente para cada tipo de cliente del Banco XYZ.
 
-La estrategia elegida separa las APIs según las necesidades de cada frontend:
+La estrategia separa contratos, datos expuestos, operaciones y controles de seguridad según las necesidades de cada frontend:
 
 ```text
 Frontend Web    -> BFF Web    -> Oracle Database
@@ -639,7 +639,7 @@ bff/
 └── atm/
 ```
 
-Cada aplicación posee su propio `pom.xml`, configuración, capa de acceso a datos, servicios, controladores y seguridad.
+Cada aplicación posee su propio `pom.xml`, configuración, acceso a datos, servicios, controladores, DTOs y seguridad. Esta separación permite que cada canal evolucione de manera independiente sin obligar a los demás clientes a consumir contratos que no necesitan.
 
 ### BFF Web
 
@@ -681,17 +681,17 @@ El resumen de cuenta contiene solamente:
 - tipo;
 - saldo.
 
-Además, el historial se limita a los últimos **5 movimientos** y cada movimiento incluye únicamente:
+El historial se limita a los últimos **5 movimientos** y cada movimiento incluye únicamente:
 
 - fecha;
 - transacción;
 - monto.
 
-De esta forma, el frontend móvil recibe un payload menor que el frontend Web.
+De esta forma, el cliente móvil evita recibir información que no necesita y reduce el tamaño de las respuestas respecto del BFF Web.
 
 ### BFF ATM
 
-El BFF ATM está orientado exclusivamente a operaciones necesarias para un cajero automático.
+El BFF ATM está orientado exclusivamente a las operaciones necesarias para un cajero automático.
 
 Endpoints principales:
 
@@ -713,23 +713,39 @@ El retiro valida que:
 
 La operación de retiro utiliza una transacción de base de datos. La cuenta se consulta mediante `SELECT ... FOR UPDATE`, se actualiza `MONTHLY_INTEREST.SALDO_FINAL` y se registra un movimiento `RETIRO_ATM` en `ANNUAL_ACCOUNT_ENTRY`.
 
-El movimiento se almacena con monto negativo para representar el débito.
-
-Si alguna operación falla, la transacción completa se revierte.
+El movimiento se almacena con monto negativo para representar el débito. Si alguna operación falla, la transacción completa se revierte.
 
 ### Seguridad por canal
 
-Cada BFF utiliza Spring Security con autenticación HTTP Basic y sesiones `STATELESS`.
+Cada BFF utiliza **Spring Security**, autenticación mediante **JWT Bearer** y sesiones `STATELESS`.
 
-Los accesos están separados por canal:
+Cada canal posee un endpoint propio para obtener un token:
 
-| BFF | Rol | Ruta protegida |
+```text
+POST /api/web/auth/token
+POST /api/mobile/auth/token
+POST /api/atm/auth/token
+```
+
+Las credenciales se validan en el BFF correspondiente. Cuando son correctas se genera un JWT firmado con **HS256**, con una vigencia de **900 segundos (15 minutos)**.
+
+Los accesos están separados mediante roles:
+
+| BFF | Rol requerido | Ruta protegida |
 |---|---|---|
 | Web | `ROLE_WEB` | `/api/web/**` |
 | Mobile | `ROLE_MOBILE` | `/api/mobile/**` |
 | ATM | `ROLE_ATM` | `/api/atm/**` |
 
-Las credenciales no se almacenan en el repositorio. Se obtienen mediante variables de entorno:
+Cada BFF utiliza además una clave de firma independiente:
+
+```text
+BFF_WEB_JWT_SECRET
+BFF_MOBILE_JWT_SECRET
+BFF_ATM_JWT_SECRET
+```
+
+Las credenciales utilizadas para solicitar los tokens tampoco se almacenan en el repositorio:
 
 ```text
 BFF_WEB_USERNAME
@@ -742,7 +758,38 @@ BFF_ATM_USERNAME
 BFF_ATM_PASSWORD
 ```
 
-Los tests de seguridad verifican solicitudes sin credenciales, credenciales incorrectas y acceso autorizado con las credenciales correspondientes al canal.
+La separación de secretos impide que un token firmado por un canal sea aceptado por otro. Además, un token correctamente firmado pero sin el rol requerido recibe una respuesta `403 Forbidden`.
+
+Las pruebas de seguridad validan los siguientes escenarios:
+
+- solicitud sin token: `401 Unauthorized`;
+- token inválido: `401 Unauthorized`;
+- token válido con rol incorrecto: `403 Forbidden`;
+- token válido con el rol del canal: acceso autorizado;
+- token firmado con una clave de otro canal: `401 Unauthorized`.
+
+Actualmente existen **13 pruebas específicas de seguridad** distribuidas entre Web, Mobile y ATM.
+
+### HTTPS
+
+Los tres BFF pueden ejecutarse mediante HTTPS utilizando el perfil Spring `https`.
+
+| BFF | Puerto HTTP | Puerto HTTPS |
+|---|---:|---:|
+| Web | 8081 | 8441 |
+| Mobile | 8082 | 8442 |
+| ATM | 8083 | 8443 |
+
+El perfil HTTPS utiliza un `KeyStore` PKCS12 configurado mediante variables de entorno:
+
+```text
+BFF_TLS_KEYSTORE_PATH
+BFF_TLS_KEYSTORE_PASSWORD
+```
+
+Para desarrollo local se utiliza un certificado autofirmado para `localhost`. El archivo del certificado local no se versiona en Git y su procedimiento de generación se encuentra documentado en `certs/README.md`.
+
+En un ambiente productivo el certificado autofirmado debe reemplazarse por un certificado emitido por una autoridad certificadora confiable.
 
 ### Diferencias entre los BFF
 
@@ -750,37 +797,88 @@ Los tests de seguridad verifican solicitudes sin credenciales, credenciales inco
 |---|---|---|---|
 | Detalle de cuenta | Completo | Reducido | Solo saldo |
 | Campos principales | 7 | 3 | 2 |
-| Movimientos | Historial completo | Últimos 5 | Solo registra retiros |
-| Operaciones críticas | No | No | Retiro |
-| Seguridad | `ROLE_WEB` | `ROLE_MOBILE` | `ROLE_ATM` |
+| Movimientos | Historial completo | Últimos 5 | Registra retiros |
+| Operación crítica | No | No | Retiro |
+| Rol | `ROLE_WEB` | `ROLE_MOBILE` | `ROLE_ATM` |
+| Autenticación | JWT Bearer | JWT Bearer | JWT Bearer |
+| Clave JWT | Independiente | Independiente | Independiente |
 
-Esta separación permite adaptar cantidad de datos, operaciones y controles de seguridad a las necesidades específicas de cada frontend.
+Esta separación adapta tanto el volumen de información como las operaciones y los controles de seguridad a las necesidades específicas de cada frontend.
+
+### Optimización de respuestas
+
+La personalización de los contratos fue validada mediante mediciones locales sobre la cuenta `101`. Cada endpoint tuvo una solicitud inicial de calentamiento y posteriormente **5 mediciones**.
+
+Para la consulta principal de cuenta se obtuvieron los siguientes resultados:
+
+| Canal | Tamaño | Tiempo promedio |
+|---|---:|---:|
+| Web | 122 bytes | 40,19 ms |
+| Mobile | 47 bytes | 39,66 ms |
+| ATM | 39 bytes | 40,52 ms |
+
+Respecto de Web, el resumen Mobile reduce el tamaño de la respuesta aproximadamente un **61,5 %**, mientras que la consulta de saldo ATM lo reduce aproximadamente un **68,0 %**.
+
+La diferencia es aún mayor en el historial de movimientos:
+
+| Canal | Tamaño | Movimientos | Tiempo promedio |
+|---|---:|---:|---:|
+| Web | 4049 bytes | 32 | 60,22 ms |
+| Mobile | 302 bytes | 5 | 38,58 ms |
+
+En este caso Mobile reduce aproximadamente un **92,5 %** el payload al entregar solo los últimos cinco movimientos y los campos requeridos por el cliente.
+
+Los tiempos obtenidos corresponden a ejecuciones locales y pueden variar entre mediciones, por lo que no se consideran un benchmark de producción ni un SLA. La evidencia principal de optimización es la reducción del volumen de datos transferidos según las necesidades de cada canal.
 
 ### Consideraciones del patrón BFF
 
 El patrón BFF permite reducir lógica específica del canal en los clientes, disminuir información innecesaria y evolucionar las APIs de Web, Mobile y ATM de manera independiente.
 
-No obstante, introduce más aplicaciones que mantener y puede generar duplicación si la lógica de negocio se implementa directamente en varios BFF. Por esta razón, resulta especialmente útil cuando los frontends poseen necesidades claramente diferentes.
+No obstante, introduce más aplicaciones que mantener y puede producir duplicación si la misma lógica de negocio comienza a implementarse en múltiples BFF. Por esta razón resulta especialmente útil cuando los frontends poseen necesidades claramente diferentes.
 
-En comparación con Web, un cliente Mobile suele beneficiarse de respuestas más pequeñas por sus restricciones de ancho de banda, latencia, tamaño de pantalla y recursos del dispositivo. El cliente Web puede recibir información más completa para interfaces con mayor cantidad de datos y funcionalidades.
+Un **API Gateway** y un BFF cumplen responsabilidades distintas y pueden coexistir. El Gateway puede centralizar aspectos transversales de entrada, mientras que los BFF mantienen contratos y comportamiento específicos para cada cliente.
 
-La personalización por canal también mejora el rendimiento y la experiencia de usuario al evitar transferir información innecesaria y reducir el procesamiento requerido por cada frontend. En este proyecto esto se observa directamente en la diferencia entre el detalle completo de Web, el resumen limitado de Mobile y la respuesta mínima del ATM.
+Como evolución futura, si aumenta la lógica compartida de acceso al sistema legacy, podría incorporarse una capa o adaptador común de acceso a datos manteniendo separados los contratos y reglas particulares de Web, Mobile y ATM.
 
-### Evidencias Semana 4
+### Reflexiones de diseño
 
-Las evidencias de ejecución, personalización por canal, estructura de los tres BFF y resultados de las pruebas se encuentran en:
+**¿Qué necesidades pueden tener diferentes frontends?**
 
-[`evidencias/semana_4/`](evidencias/semana_4/README.md)
+Cada frontend puede requerir distinta cantidad de información, operaciones, formatos de respuesta, controles de seguridad y nivel de optimización. En este proyecto Web necesita información más completa, Mobile privilegia respuestas livianas y ATM limita su interfaz a operaciones concretas y críticas.
+
+**¿Qué se debe considerar antes de implementar BFF?**
+
+Debe existir una diferencia real entre las necesidades de los clientes que justifique mantener backends independientes. También deben evaluarse el costo operacional, la duplicación potencial de lógica, la seguridad y la capacidad del equipo para mantener varias aplicaciones.
+
+**¿Cuándo conviene crear backends independientes por cliente?**
+
+Cuando los clientes poseen contratos, ritmos de evolución, operaciones o requisitos de seguridad suficientemente diferentes. Si las diferencias son mínimas, puede ser más conveniente mantener un backend común con endpoints personalizados.
+
+**¿Cuándo conviene utilizar endpoints personalizados en vez de BFF independientes?**
+
+Cuando todos los clientes comparten prácticamente la misma lógica, infraestructura y ciclo de evolución, y solo requieren pequeñas variaciones en los datos entregados. En ese escenario, separar aplicaciones completas agregaría complejidad sin un beneficio proporcional.
+
+**¿Qué ventajas ofrece BFF en una arquitectura de microservicios?**
+
+Permite ocultar al frontend la composición de múltiples servicios, adaptar los datos a cada cliente y evitar que Web, Mobile o ATM deban conocer directamente la distribución interna de los microservicios. También permite modificar los contratos externos sin obligar a que todos los clientes evolucionen al mismo tiempo.
+
+### Evidencias
+
+Las evidencias se mantienen organizadas por entrega:
+
+- [`evidencias/semana_4/`](evidencias/semana_4/README.md): implementación inicial de los tres BFF.
+- [`evidencias/semana_5/`](evidencias/semana_5/README.md): HTTPS, JWT, autorización por canal, optimización de respuestas y validación global.
 
 ## Pruebas
-El proyecto contiene pruebas para los tres `ItemProcessor`, la política personalizada de tolerancia a fallos y la carga del contexto de Spring.
 
-Actualmente existen:
+El proyecto contiene pruebas para el procesamiento Batch y pruebas de integración para los tres BFF.
 
-- 2 pruebas para `DailyTransactionProcessor`.
-- 2 pruebas para `MonthlyInterestProcessor`.
-- 2 pruebas para `AnnualAccountProcessor`.
-- 3 pruebas para `BankDataSkipPolicy`.
+En el módulo Batch existen:
+
+- 2 pruebas para `DailyTransactionProcessor`;
+- 2 pruebas para `MonthlyInterestProcessor`;
+- 2 pruebas para `AnnualAccountProcessor`;
+- 3 pruebas para `BankDataSkipPolicy`;
 - 1 prueba de carga del contexto con `BankLegacyApplicationTests`.
 
 Para ejecutar solamente las pruebas de los Processors:
@@ -789,13 +887,13 @@ Para ejecutar solamente las pruebas de los Processors:
 .\mvnw.cmd test "-Dtest=*ProcessorTest"
 ```
 
-Para ejecutar toda la suite:
+Para ejecutar toda la suite Batch:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-La suite principal del proyecto Batch finaliza actualmente con:
+La suite Batch contiene actualmente:
 
 ```text
 Tests run: 10
@@ -805,26 +903,25 @@ Skipped: 0
 
 BUILD SUCCESS
 ```
----
 
+### Validación global
 
-### Validación global Semana 4
+La validación completa ejecuta las pruebas de Batch, BFF Web, BFF Mobile y BFF ATM.
 
-Además de los 10 tests existentes del procesamiento Batch, los tres BFF poseen pruebas de integración para acceso a datos, endpoints y seguridad.
-
-Resultados finales:
+Resultados actuales:
 
 | Módulo | Tests | Fallos | Errores | Omitidos |
 |---|---:|---:|---:|---:|
-| Batch S1-S3 | 10 | 0 | 0 | 0 |
-| BFF Web | 9 | 0 | 0 | 0 |
-| BFF Mobile | 9 | 0 | 0 | 0 |
-| BFF ATM | 10 | 0 | 0 | 0 |
-| **Total** | **38** | **0** | **0** | **0** |
+| Batch | 10 | 0 | 0 | 0 |
+| BFF Web | 10 | 0 | 0 | 0 |
+| BFF Mobile | 11 | 0 | 0 | 0 |
+| BFF ATM | 11 | 0 | 0 | 0 |
+| **Total** | **42** | **0** | **0** | **0** |
 
-La validación global confirma que la incorporación de los BFF no rompe las funcionalidades Batch desarrolladas durante las semanas anteriores.
+La validación global confirma que la evolución de seguridad y configuración de los BFF no rompe las funcionalidades Batch ni los endpoints desarrollados anteriormente.
 
 ## Estado actual
+
 Los tres Jobs principales se encuentran operativos:
 
 | Job | Estado |
@@ -833,18 +930,17 @@ Los tres Jobs principales se encuentran operativos:
 | `monthlyInterestJob` | `COMPLETED` |
 | `annualAccountJob` | `COMPLETED` |
 
-
 ### Estado de los BFF
 
-| Backend | Puerto | Estado |
-|---|---:|---|
-| BFF Web | 8081 | Operativo |
-| BFF Mobile | 8082 | Operativo |
-| BFF ATM | 8083 | Operativo |
+| Backend | HTTP | HTTPS con perfil `https` | Estado |
+|---|---:|---:|---|
+| BFF Web | 8081 | 8441 | Operativo |
+| BFF Mobile | 8082 | 8442 | Operativo |
+| BFF ATM | 8083 | 8443 | Operativo |
 
-Los tres backends utilizan la misma base Oracle, pero exponen APIs, DTOs y reglas específicas para su respectivo frontend.
+Los tres backends utilizan la misma base Oracle, pero exponen APIs, DTOs, reglas y controles de seguridad específicos para su respectivo frontend.
 
-Resultados validados con los datos de Semana 3:
+Resultados actuales del procesamiento Batch con los datos utilizados para validación:
 
 | Job | Leídos | Persistidos | Omitidos | Resultado final DB |
 |---|---:|---:|---:|---:|
@@ -853,3 +949,5 @@ Resultados validados con los datos de Semana 3:
 | Annual | 1000 | 732 | 268 | 732 movimientos |
 
 La aplicación actualmente lee archivos CSV legacy, valida y transforma sus registros, maneja datos inválidos mediante `skip`, reintenta fallos temporales mediante `retry`, procesa datos en paralelo mediante partitioning, recupera ejecuciones mediante restart/checkpoint, persiste los resultados en Oracle Database y genera los reportes correspondientes.
+
+En paralelo, los BFF Web, Mobile y ATM proporcionan interfaces específicas por cliente, autenticación y autorización mediante JWT, comunicación HTTPS configurable y respuestas optimizadas según las necesidades de cada canal.
