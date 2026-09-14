@@ -1,10 +1,22 @@
 package com.bank.bff.mobile.security;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
+
+import javax.crypto.spec.SecretKeySpec;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -24,6 +36,9 @@ class MobileSecurityIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JwtEncoder jwtEncoder;
+
     @Test
     void debeRechazarSolicitudSinToken() throws Exception {
         mockMvc.perform(get("/api/mobile/accounts/101/summary"))
@@ -39,6 +54,30 @@ class MobileSecurityIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void debeRechazarTokenConRolDeOtroCanal() throws Exception {
+
+        String token = crearTokenConRol("ROLE_WEB");
+
+        mockMvc.perform(get("/api/mobile/accounts/101/summary")
+                        .header(
+                                "Authorization",
+                                "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void debeRechazarTokenFirmadoPorOtroCanal() throws Exception {
+
+        String tokenWeb = crearTokenFirmadoPorOtroCanal(
+                "ROLE_WEB");
+
+        mockMvc.perform(get("/api/mobile/accounts/101/summary")
+                        .header(
+                                "Authorization",
+                                "Bearer " + tokenWeb))
+                .andExpect(status().isUnauthorized());
+    }
     @Test
     void debePermitirTokenValidoDelCanal() throws Exception {
 
@@ -83,4 +122,55 @@ class MobileSecurityIntegrationTest {
 
         return json.substring(start, end);
     }
-}
+
+    private String crearTokenConRol(String role) {
+
+        Instant now = Instant.now();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("test-security")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(900))
+                .subject("test-cross-channel")
+                .claim("roles", List.of(role))
+                .claim("channel", "test")
+                .build();
+
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
+                .build();
+
+        return jwtEncoder.encode(
+                        JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
+    }
+
+    private String crearTokenFirmadoPorOtroCanal(String role) {
+
+        var otherKey = new SecretKeySpec(
+                "web-channel-secret-for-cross-test-123456"
+                        .getBytes(StandardCharsets.UTF_8),
+                "HmacSHA256");
+
+        var otherEncoder = NimbusJwtEncoder
+                .withSecretKey(otherKey)
+                .algorithm(MacAlgorithm.HS256)
+                .build();
+
+        Instant now = Instant.now();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("bank-bff-web")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(900))
+                .subject("test-web")
+                .claim("roles", List.of(role))
+                .claim("channel", "web")
+                .build();
+
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
+                .build();
+
+        return otherEncoder.encode(
+                        JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
+    }}

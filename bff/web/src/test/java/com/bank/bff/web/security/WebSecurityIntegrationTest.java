@@ -1,10 +1,18 @@
 package com.bank.bff.web.security;
 
+import java.time.Instant;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -24,6 +32,9 @@ class WebSecurityIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JwtEncoder jwtEncoder;
+
     @Test
     void debeRechazarSolicitudSinToken() throws Exception {
         mockMvc.perform(get("/api/web/accounts/101"))
@@ -37,6 +48,18 @@ class WebSecurityIntegrationTest {
                                 "Authorization",
                                 "Bearer token-invalido"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void debeRechazarTokenConRolDeOtroCanal() throws Exception {
+
+        String token = crearTokenConRol("ROLE_MOBILE");
+
+        mockMvc.perform(get("/api/web/accounts/101")
+                        .header(
+                                "Authorization",
+                                "Bearer " + token))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -82,5 +105,26 @@ class WebSecurityIntegrationTest {
         int end = json.indexOf('"', start);
 
         return json.substring(start, end);
+    }
+
+    private String crearTokenConRol(String role) {
+
+        Instant now = Instant.now();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("test-security")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(900))
+                .subject("test-cross-channel")
+                .claim("roles", List.of(role))
+                .claim("channel", "test")
+                .build();
+
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
+                .build();
+
+        return jwtEncoder.encode(
+                        JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
     }
 }
