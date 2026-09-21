@@ -1,6 +1,6 @@
 # Bank Legacy
 
-Proyecto desarrollado con **Spring Batch** para procesar información legacy del Banco XYZ almacenada en archivos CSV.
+Proyecto desarrollado con **Spring Boot** para procesar información legacy del Banco XYZ mediante Spring Batch, Backend for Frontend y microservicios con Spring Cloud.
 
 La aplicación actualmente ejecuta tres procesos batch independientes:
 
@@ -16,6 +16,11 @@ Los archivos son leídos mediante Spring Batch, sus registros son validados y tr
 - Spring Boot 4.1.0
 - Spring Batch 6.0.4
 - Spring JDBC
+- Spring Security
+- Spring Cloud Config
+- Netflix Eureka
+- Spring Cloud Circuit Breaker
+- Resilience4j
 - Oracle Database
 - Maven
 - JUnit 5
@@ -64,6 +69,8 @@ src/
             ├── DailyTransactionProcessorTest.java
             └── MonthlyInterestProcessorTest.java
 ```
+Además del módulo Batch raíz, el repositorio contiene `bff/` para los backends Web, Mobile y ATM, `cloud/` para Config Server y Eureka, y `microservices/` para `account-service`, `transaction-service` y `movement-service`.
+
 ## Flujo de procesamiento
 
 Los procesos batch utilizan principalmente el siguiente flujo:
@@ -423,6 +430,20 @@ Para eliminar la selección del Job:
 Remove-Item Env:SPRING_BATCH_JOB_NAME
 ```
 
+### Servicios distribuidos
+
+La arquitectura distribuida se inicia en este orden:
+
+```text
+Config Server       -> 8888
+Eureka Server       -> 8761
+account-service     -> 8091
+transaction-service -> 8092
+movement-service    -> 8093
+```
+
+Los tres microservicios obtienen su configuración desde Config Server y se registran en Eureka al iniciar.
+
 ---
 
 ## Manejo de errores y tolerancia a fallos
@@ -538,9 +559,17 @@ La segunda ejecución terminó `COMPLETED` y `DAILY_TRANSACTION` quedó con 401 
 
 Esto demuestra que una partición fallida puede recuperarse sin volver a procesar todo el batch.
 
+### Circuit Breaker en microservicios
+
+`account-service`, `transaction-service` y `movement-service` utilizan Spring Cloud Circuit Breaker con Resilience4j para proteger el acceso a Oracle.
+
+Cada servicio posee una instancia independiente (`accountDatabase`, `transactionDatabase` y `movementDatabase`). Ante fallos del acceso a datos, el servicio responde con `503 Service Unavailable` y el Circuit Breaker puede abrirse para evitar nuevos intentos mientras persiste el problema.
+
+La configuración de estas instancias se mantiene centralizada en `cloud/config-repo/`.
+
 ## Escalamiento y procesamiento paralelo
 
-En Semana 3 los tres procesos principales utilizan **partitioning**.
+Los tres procesos principales utilizan **partitioning**.
 
 La configuración normal es:
 
@@ -770,6 +799,16 @@ Las pruebas de seguridad validan los siguientes escenarios:
 
 Actualmente existen **13 pruebas específicas de seguridad** distribuidas entre Web, Mobile y ATM.
 
+#### Seguridad de microservicios
+
+`account-service`, `transaction-service` y `movement-service` utilizan Spring Security con JWT Bearer y sesiones `STATELESS`. Cada servicio posee credenciales, clave de firma y rol independientes:
+
+- `account-service`: `ROLE_ACCOUNT`
+- `transaction-service`: `ROLE_TRANSACTION`
+- `movement-service`: `ROLE_MOVEMENT`
+
+La autorización fue validada en los tres servicios: una solicitud sin token responde `401 Unauthorized`, un token válido con rol incorrecto responde `403 Forbidden` y un token válido con el rol correspondiente permite el acceso con `200 OK`.
+
 ### HTTPS
 
 Los tres BFF pueden ejecutarse mediante HTTPS utilizando el perfil Spring `https`.
@@ -842,32 +881,33 @@ Como evolución futura, si aumenta la lógica compartida de acceso al sistema le
 
 ### Reflexiones de diseño
 
-**¿Qué necesidades pueden tener diferentes frontends?**
+**¿Por qué es útil dividir un sistema en microservicios?**
 
-Cada frontend puede requerir distinta cantidad de información, operaciones, formatos de respuesta, controles de seguridad y nivel de optimización. En este proyecto Web necesita información más completa, Mobile privilegia respuestas livianas y ATM limita su interfaz a operaciones concretas y críticas.
+Permite separar responsabilidades en servicios independientes, de modo que cada componente pueda evolucionar, desplegarse y mantenerse sin concentrar toda la lógica del sistema en una sola aplicación.
 
-**¿Qué se debe considerar antes de implementar BFF?**
+**¿Cómo puede un sistema mantenerse funcionando incluso cuando un servicio falla?**
 
-Debe existir una diferencia real entre las necesidades de los clientes que justifique mantener backends independientes. También deben evaluarse el costo operacional, la duplicación potencial de lógica, la seguridad y la capacidad del equipo para mantener varias aplicaciones.
+Mediante mecanismos de tolerancia a fallos que eviten propagar el problema al resto del sistema. En este proyecto se utiliza Circuit Breaker para detectar fallos repetidos y evitar nuevos intentos mientras la dependencia continúa indisponible.
 
-**¿Cuándo conviene crear backends independientes por cliente?**
+**¿Qué aporta Spring Cloud a la construcción de microservicios?**
 
-Cuando los clientes poseen contratos, ritmos de evolución, operaciones o requisitos de seguridad suficientemente diferentes. Si las diferencias son mínimas, puede ser más conveniente mantener un backend común con endpoints personalizados.
+Aporta componentes para resolver necesidades comunes de una arquitectura distribuida. En este proyecto se utiliza Spring Cloud Config para centralizar configuración, Eureka para descubrimiento de servicios y Spring Cloud Circuit Breaker para integrar tolerancia a fallos.
 
-**¿Cuándo conviene utilizar endpoints personalizados en vez de BFF independientes?**
+**¿Por qué es importante contar con mecanismos de seguridad en una arquitectura distribuida?**
 
-Cuando todos los clientes comparten prácticamente la misma lógica, infraestructura y ciclo de evolución, y solo requieren pequeñas variaciones en los datos entregados. En ese escenario, separar aplicaciones completas agregaría complejidad sin un beneficio proporcional.
+Porque existen múltiples servicios y endpoints que deben controlar quién puede acceder a sus recursos. La autenticación mediante JWT y la autorización por roles permiten proteger cada API sin almacenar sesiones en el servidor.
 
-**¿Qué ventajas ofrece BFF en una arquitectura de microservicios?**
+**¿Cómo ayuda un Circuit Breaker a evitar que un fallo se propague dentro del sistema?**
 
-Permite ocultar al frontend la composición de múltiples servicios, adaptar los datos a cada cliente y evitar que Web, Mobile o ATM deban conocer directamente la distribución interna de los microservicios. También permite modificar los contratos externos sin obligar a que todos los clientes evolucionen al mismo tiempo.
+Cuando detecta una cantidad suficiente de fallos, abre el circuito y evita seguir ejecutando temporalmente la operación que está fallando. Esto reduce llamadas innecesarias a una dependencia con problemas y permite responder de forma controlada mientras se recupera.
 
 ### Evidencias
 
 Las evidencias se mantienen organizadas por entrega:
 
 - [`evidencias/semana_4/`](evidencias/semana_4/README.md): implementación inicial de los tres BFF.
-- [`evidencias/semana_5/`](evidencias/semana_5/README.md): HTTPS, JWT, autorización por canal, optimización de respuestas y validación global.
+- [`evidencias/semana_5/`](evidencias/semana_5/README.md): HTTPS, JWT, autorización por canal, optimización de respuestas y validación global.
+- [`evidencias/semana_6/`](evidencias/semana_6/README.md): Config Server, Eureka, Circuit Breaker y seguridad de los microservicios.
 
 ## Pruebas
 
@@ -939,6 +979,10 @@ Los tres Jobs principales se encuentran operativos:
 | BFF ATM | 8083 | 8443 | Operativo |
 
 Los tres backends utilizan la misma base Oracle, pero exponen APIs, DTOs, reglas y controles de seguridad específicos para su respectivo frontend.
+
+La arquitectura distribuida utiliza además Spring Cloud Config en el puerto `8888` y Eureka Server en el puerto `8761`. Los microservicios consumen su configuración desde Config Server y se registran en Eureka.
+
+`account-service` (`8091`), `transaction-service` (`8092`) y `movement-service` (`8093`) exponen APIs sobre los datos migrados de cuentas, transacciones y movimientos, respectivamente.
 
 Resultados actuales del procesamiento Batch con los datos utilizados para validación:
 
