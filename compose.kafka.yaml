@@ -1,0 +1,6 @@
+services:
+  kafka:
+    image: apache/kafka:4.1.2
+    container_name: bank-legacy-kafka
+    ports:
+      - "127.0.0.1:9092:9092"
