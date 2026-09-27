@@ -1,0 +1,25 @@
+SEMANA 7 - ESCALABILIDAD KAFKA
+
+Instancia principal: particiones 0 y 1, 11 eventos.
+Instancia adicional: particion 2, 1 evento.
+
+REGISTROS DE INSTANCIA PRINCIPAL:
+2026-09-26T19:00:55.165-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826602, particion=0, offset=1
+2026-09-26T19:00:55.165-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826604, particion=0, offset=2
+2026-09-26T19:00:55.165-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826605, particion=0, offset=3
+2026-09-26T19:00:55.165-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826606, particion=0, offset=4
+2026-09-26T19:00:55.166-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826608, particion=0, offset=5
+2026-09-26T19:00:55.166-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826609, particion=0, offset=6
+2026-09-26T19:00:55.166-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826611, particion=0, offset=7
+2026-09-26T19:00:55.166-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826600, particion=1, offset=0
+2026-09-26T19:00:55.166-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826601, particion=1, offset=1
+2026-09-26T19:00:55.167-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826603, particion=1, offset=2
+2026-09-26T19:00:55.167-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826610, particion=1, offset=3
+
+REGISTROS DE INSTANCIA ADICIONAL:
+2026-09-26T19:00:55.178-03:00  INFO 8568 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=179046004826607, particion=2, offset=0
+
+ESTADO FINAL DEL GRUPO:
+
+GROUP                  CONSUMER-ID                                                            HOST            CLIENT-ID                         #PARTITIONS     CURRENT-EPOCH   CURRENT-ASSIGNMENT      TARGET-EPOCH    TARGET-ASSIGNMENT   
+movement-service-group consumer-movement-service-group-1-166c264b-7006-4557-abfd-01e8bc7ff865 /172.22.0.1     consumer-movement-service-group-1 3               -               bank.transactions:0,1,2 -               -                   

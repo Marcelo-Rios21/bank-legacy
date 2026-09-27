@@ -1,0 +1,18 @@
+SEMANA 7 - CIRCUIT BREAKER
+
+Instancia aislada: puerto 8192.
+Conexion Oracle deliberadamente inaccesible.
+
+Consulta 1: HTTP 503 - 2559 ms
+Consulta 2: HTTP 503 - 2511 ms
+Consulta 3: HTTP 503 - 4 ms
+Consulta 4: HTTP 503 - 3 ms
+
+TRANSICIONES REALES DE RESILIENCE4J:
+2026-09-26T19:04:04.901-03:00 DEBUG 24656 --- [transaction-service] [0.1-8192-exec-2] i.g.r.c.i.CircuitBreakerStateMachine     : Event FAILURE_RATE_EXCEEDED published: 2026-09-26T19:04:04.901612400-03:00[America/Santiago]: CircuitBreaker 'transactionDatabase' exceeded failure rate threshold. Current failure rate: 100.0
+2026-09-26T19:04:04.904-03:00 DEBUG 24656 --- [transaction-service] [0.1-8192-exec-2] i.g.r.c.i.CircuitBreakerStateMachine     : Event STATE_TRANSITION published: 2026-09-26T19:04:04.904612600-03:00[America/Santiago]: CircuitBreaker 'transactionDatabase' changed state from CLOSED to OPEN
+2026-09-26T19:04:04.910-03:00 DEBUG 24656 --- [transaction-service] [0.1-8192-exec-4] i.g.r.c.i.CircuitBreakerStateMachine     : Event NOT_PERMITTED published: 2026-09-26T19:04:04.910639700-03:00[America/Santiago]: CircuitBreaker 'transactionDatabase' recorded a call which was not permitted.
+2026-09-26T19:04:04.914-03:00 DEBUG 24656 --- [transaction-service] [0.1-8192-exec-5] i.g.r.c.i.CircuitBreakerStateMachine     : Event NOT_PERMITTED published: 2026-09-26T19:04:04.913639500-03:00[America/Santiago]: CircuitBreaker 'transactionDatabase' recorded a call which was not permitted.
+2026-09-26T19:04:14.905-03:00 DEBUG 24656 --- [transaction-service] [ransitionThread] i.g.r.c.i.CircuitBreakerStateMachine     : Event STATE_TRANSITION published: 2026-09-26T19:04:14.905404800-03:00[America/Santiago]: CircuitBreaker 'transactionDatabase' changed state from OPEN to HALF_OPEN
+
+La instancia principal permanecio operativa.

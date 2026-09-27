@@ -1,0 +1,7 @@
+SEMANA 7 - PUBLICACION Y CONSUMO
+
+Prueba realizada: POST /api/transactions/1/publish
+Resultado observado en consola: HTTP 202
+
+Registro real del consumidor:
+2026-09-26T18:51:40.609-03:00  INFO 26364 --- [movement-service] [ntainer#0-0-C-1] c.b.m.m.event.TransactionEventListener   : Evento procesado: transaccion=1, particion=0, offset=0

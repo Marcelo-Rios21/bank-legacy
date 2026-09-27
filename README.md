@@ -1,6 +1,6 @@
 # Bank Legacy
 
-Proyecto desarrollado con **Spring Boot** para procesar información legacy del Banco XYZ mediante Spring Batch, Backend for Frontend y microservicios con Spring Cloud.
+Proyecto desarrollado con **Spring Boot** para procesar información legacy del Banco XYZ mediante Spring Batch, Backend for Frontend y microservicios con Spring Cloud y comunicación asíncrona mediante Apache Kafka.
 
 La aplicación actualmente ejecuta tres procesos batch independientes:
 
@@ -21,6 +21,7 @@ Los archivos son leídos mediante Spring Batch, sus registros son validados y tr
 - Netflix Eureka
 - Spring Cloud Circuit Breaker
 - Resilience4j
+- Apache Kafka
 - Oracle Database
 - Maven
 - JUnit 5
@@ -444,6 +445,8 @@ movement-service    -> 8093
 
 Los tres microservicios obtienen su configuración desde Config Server y se registran en Eureka al iniciar.
 
+Para habilitar la mensajería asíncrona de Semana 7, Kafka se inicia desde la raíz mediante `docker compose -f compose.kafka.yaml up -d`. El tópico `bank.transactions` debe estar provisionado con tres particiones antes de ejecutar las pruebas de publicación.
+
 ---
 
 ## Manejo de errores y tolerancia a fallos
@@ -566,6 +569,20 @@ Esto demuestra que una partición fallida puede recuperarse sin volver a procesa
 Cada servicio posee una instancia independiente (`accountDatabase`, `transactionDatabase` y `movementDatabase`). Ante fallos del acceso a datos, el servicio responde con `503 Service Unavailable` y el Circuit Breaker puede abrirse para evitar nuevos intentos mientras persiste el problema.
 
 La configuración de estas instancias se mantiene centralizada en `cloud/config-repo/`.
+
+## Comunicación asíncrona con Kafka (Semana 7)
+
+Se incorporó Apache Kafka mediante el patrón Publish/Subscribe para desacoplar la publicación y el consumo de eventos entre microservicios.
+
+`transaction-service` actúa como productor y publica un evento `TransactionSnapshotPublished` de una transacción existente mediante el endpoint autenticado `POST /api/transactions/{id}/publish`. La operación confirma la publicación con HTTP 202.
+
+`movement-service` consume los eventos desde el tópico `bank.transactions`, que posee tres particiones y utiliza el grupo `movement-service-group`. El consumidor valida y registra los eventos, sin modificar saldos ni generar movimientos financieros adicionales.
+
+Se comprobó el funcionamiento extremo a extremo con Oracle, el procesamiento distribuido mediante dos consumidores y la apertura del Circuit Breaker Resilience4j ante una conexión de base de datos inaccesible.
+
+Los detalles técnicos, el diagrama arquitectónico y los registros de las pruebas están disponibles en la [documentación de Semana 7](evidencias/semana_7/README.md).
+
+---
 
 ## Escalamiento y procesamiento paralelo
 
@@ -908,6 +925,7 @@ Las evidencias se mantienen organizadas por entrega:
 - [`evidencias/semana_4/`](evidencias/semana_4/README.md): implementación inicial de los tres BFF.
 - [`evidencias/semana_5/`](evidencias/semana_5/README.md): HTTPS, JWT, autorización por canal, optimización de respuestas y validación global.
 - [`evidencias/semana_6/`](evidencias/semana_6/README.md): Config Server, Eureka, Circuit Breaker y seguridad de los microservicios.
+- [`evidencias/semana_7/`](evidencias/semana_7/README.md): Kafka, Publish/Subscribe, escalabilidad de consumidores y pruebas de tolerancia a fallos.
 
 ## Pruebas
 
@@ -959,6 +977,8 @@ Resultados actuales:
 | **Total** | **42** | **0** | **0** | **0** |
 
 La validación global confirma que la evolución de seguridad y configuración de los BFF no rompe las funcionalidades Batch ni los endpoints desarrollados anteriormente.
+
+Adicionalmente, en Semana 7 se aprobaron tres pruebas unitarias específicas de Kafka: una del publicador y dos del consumidor. Se ejecutaron por separado y no forman parte del subtotal histórico de 42 pruebas Batch y BFF.
 
 ## Estado actual
 
