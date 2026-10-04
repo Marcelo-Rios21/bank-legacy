@@ -1,0 +1,20 @@
+=== SEMANA 8 - RESILIENCE4J EN DOCKER ===
+
+=== ESTADO NORMAL ===
+account-service -> HTTP 200
+
+=== FALLA CONTROLADA DE ORACLE ===
+Spring Boot listo -> HTTP 401 sin token
+
+=== CIRCUIT BREAKER ===
+Llamada 1 -> HTTP 503 - 3379 ms
+Llamada 2 -> HTTP 503 - 2142 ms
+Llamada 3 -> HTTP 503 - 8 ms
+Llamada 4 -> HTTP 503 - 6 ms
+
+=== RECUPERACION ===
+Password correcta restaurada
+account-service -> HTTP 200
+
+Resilience4j Circuit Breaker -> OK
+Recuperacion del servicio -> OK

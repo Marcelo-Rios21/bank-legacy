@@ -17,11 +17,15 @@ Los archivos son leídos mediante Spring Batch, sus registros son validados y tr
 - Spring Batch 6.0.4
 - Spring JDBC
 - Spring Security
+- OAuth 2.0 / JWT
+- Spring Authorization Server
 - Spring Cloud Config
 - Netflix Eureka
 - Spring Cloud Circuit Breaker
 - Resilience4j
 - Apache Kafka
+- Docker
+- Docker Compose
 - Oracle Database
 - Maven
 - JUnit 5
@@ -70,8 +74,7 @@ src/
             ├── DailyTransactionProcessorTest.java
             └── MonthlyInterestProcessorTest.java
 ```
-Además del módulo Batch raíz, el repositorio contiene `bff/` para los backends Web, Mobile y ATM, `cloud/` para Config Server y Eureka, y `microservices/` para `account-service`, `transaction-service` y `movement-service`.
-
+Además del módulo Batch raíz, el repositorio contiene `bff/` para los backends Web, Mobile y ATM, `cloud/` para Authorization Server, Config Server, Eureka y la configuración centralizada, y `microservices/` para `account-service`, `transaction-service` y `movement-service`. El archivo raíz `docker-compose.yaml` orquesta la infraestructura distribuida.
 ## Flujo de procesamiento
 
 Los procesos batch utilizan principalmente el siguiente flujo:
@@ -129,7 +132,7 @@ DAILY_TRANSACTION
 
 El Writer utiliza `MERGE`, permitiendo ejecutar nuevamente el Job sin duplicar registros por ID.
 
-La ejecución actual con los datos de semana 3 obtiene:
+La ejecución actual con los datos utilizados para validación obtiene:
 
 ```text
 Registros leídos:      1000
@@ -433,19 +436,56 @@ Remove-Item Env:SPRING_BATCH_JOB_NAME
 
 ### Servicios distribuidos
 
-La arquitectura distribuida se inicia en este orden:
+La arquitectura distribuida puede ejecutarse de forma integrada mediante Docker Compose.
+
+Los componentes son:
 
 ```text
-Config Server       -> 8888
-Eureka Server       -> 8761
-account-service     -> 8091
-transaction-service -> 8092
-movement-service    -> 8093
+Authorization Server -> 9000
+Config Server        -> 8888
+Eureka Server        -> 8761
+account-service      -> 8091
+transaction-service  -> 8092
+movement-service     -> 8093
+Apache Kafka         -> 9092
+Oracle ADB           -> servicio externo
 ```
 
-Los tres microservicios obtienen su configuración desde Config Server y se registran en Eureka al iniciar.
+Los tres microservicios obtienen su configuración desde Config Server y se registran en Eureka. El Authorization Server centraliza la emisión de tokens OAuth 2.0 y Kafka proporciona la comunicación asíncrona entre los servicios de transacciones y movimientos.
 
-Para habilitar la mensajería asíncrona de Semana 7, Kafka se inicia desde la raíz mediante `docker compose -f compose.kafka.yaml up -d`. El tópico `bank.transactions` debe estar provisionado con tres particiones antes de ejecutar las pruebas de publicación.
+Las credenciales y datos sensibles se entregan mediante variables de entorno:
+
+```text
+DB_URL
+DB_USERNAME
+DB_PASSWORD
+OAUTH2_CLIENT_ID
+OAUTH2_CLIENT_SECRET
+```
+
+Para levantar la arquitectura desde la raíz:
+
+```powershell
+docker compose up -d
+```
+
+Para comprobar su estado:
+
+```powershell
+docker compose ps
+```
+
+El tópico `bank.transactions` utiliza tres particiones.
+
+Para detener los contenedores:
+
+```powershell
+docker compose down
+```
+
+Dentro de la red Docker se utilizan los nombres internos `config-server`, `discovery-server`, `authorization-server` y `kafka`. Kafka utiliza `kafka:19092` para la comunicación entre contenedores.
+
+El archivo `compose.kafka.yaml` se conserva para ejecutar Kafka de forma aislada durante pruebas o desarrollo. `docker-compose.yaml` corresponde a la ejecución integrada de la arquitectura.
 
 ---
 
@@ -570,7 +610,20 @@ Cada servicio posee una instancia independiente (`accountDatabase`, `transaction
 
 La configuración de estas instancias se mantiene centralizada en `cloud/config-repo/`.
 
-## Comunicación asíncrona con Kafka (Semana 7)
+El comportamiento también fue validado dentro del entorno Docker mediante una falla controlada de Oracle en `account-service`:
+
+```text
+Llamada 1 -> HTTP 503 - 3379 ms
+Llamada 2 -> HTTP 503 - 2142 ms
+Llamada 3 -> HTTP 503 - 8 ms
+Llamada 4 -> HTTP 503 - 6 ms
+```
+
+Las primeras solicitudes intentan acceder a la dependencia no disponible. Las siguientes son rechazadas casi inmediatamente después de abrirse el circuito.
+
+Después de restaurar la conexión, `account-service` volvió a responder HTTP 200.
+
+## Comunicación asíncrona con Kafka
 
 Se incorporó Apache Kafka mediante el patrón Publish/Subscribe para desacoplar la publicación y el consumo de eventos entre microservicios.
 
@@ -580,7 +633,9 @@ Se incorporó Apache Kafka mediante el patrón Publish/Subscribe para desacoplar
 
 Se comprobó el funcionamiento extremo a extremo con Oracle, el procesamiento distribuido mediante dos consumidores y la apertura del Circuit Breaker Resilience4j ante una conexión de base de datos inaccesible.
 
-Los detalles técnicos, el diagrama arquitectónico y los registros de las pruebas están disponibles en la [documentación de Semana 7](evidencias/semana_7/README.md).
+La integración también fue validada dentro de Docker Compose: `transaction-service` publicó una transacción con HTTP 202 y `movement-service` confirmó el consumo del evento desde `bank.transactions`.
+
+Los detalles técnicos, el diagrama arquitectónico y los registros de las pruebas están disponibles en la [documentación técnica de Kafka](evidencias/semana_7/README.md).
 
 ---
 
@@ -818,13 +873,29 @@ Actualmente existen **13 pruebas específicas de seguridad** distribuidas entre 
 
 #### Seguridad de microservicios
 
-`account-service`, `transaction-service` y `movement-service` utilizan Spring Security con JWT Bearer y sesiones `STATELESS`. Cada servicio posee credenciales, clave de firma y rol independientes:
+`account-service`, `transaction-service` y `movement-service` funcionan como **OAuth 2.0 Resource Servers** con sesiones `STATELESS`.
 
-- `account-service`: `ROLE_ACCOUNT`
-- `transaction-service`: `ROLE_TRANSACTION`
-- `movement-service`: `ROLE_MOVEMENT`
+Los tokens JWT son emitidos por el `authorization-server` central mediante el grant **Client Credentials**.
 
-La autorización fue validada en los tres servicios: una solicitud sin token responde `401 Unauthorized`, un token válido con rol incorrecto responde `403 Forbidden` y un token válido con el rol correspondiente permite el acceso con `200 OK`.
+Los scopes utilizados son:
+
+| Scope | Operación |
+|---|---|
+| `account.read` | Consultar cuentas |
+| `transaction.read` | Consultar transacciones |
+| `transaction.publish` | Publicar eventos de transacciones |
+| `movement.read` | Consultar movimientos |
+
+La autorización fue validada con los siguientes escenarios:
+
+- solicitud sin token: `401 Unauthorized`;
+- token válido sin el scope requerido: `403 Forbidden`;
+- token válido con el scope requerido: acceso autorizado;
+- publicación con `transaction.publish`: `202 Accepted`.
+
+Los microservicios no generan tokens ni mantienen claves JWT locales. La emisión queda centralizada en el Authorization Server.
+
+Esta estrategia es independiente de la seguridad de los BFF Web, Mobile y ATM, que mantienen su autenticación y autorización específicas por canal.
 
 ### HTTPS
 
@@ -902,30 +973,40 @@ Como evolución futura, si aumenta la lógica compartida de acceso al sistema le
 
 Permite separar responsabilidades en servicios independientes, de modo que cada componente pueda evolucionar, desplegarse y mantenerse sin concentrar toda la lógica del sistema en una sola aplicación.
 
-**¿Cómo puede un sistema mantenerse funcionando incluso cuando un servicio falla?**
+**¿Cómo se integran microservicios, seguridad y resiliencia?**
 
-Mediante mecanismos de tolerancia a fallos que eviten propagar el problema al resto del sistema. En este proyecto se utiliza Circuit Breaker para detectar fallos repetidos y evitar nuevos intentos mientras la dependencia continúa indisponible.
+Los microservicios separan responsabilidades de negocio, OAuth 2.0 controla qué operaciones puede realizar cada cliente mediante tokens y scopes, y Resilience4j protege las llamadas hacia dependencias que pueden fallar.
 
 **¿Qué aporta Spring Cloud a la construcción de microservicios?**
 
 Aporta componentes para resolver necesidades comunes de una arquitectura distribuida. En este proyecto se utiliza Spring Cloud Config para centralizar configuración, Eureka para descubrimiento de servicios y Spring Cloud Circuit Breaker para integrar tolerancia a fallos.
 
-**¿Por qué es importante contar con mecanismos de seguridad en una arquitectura distribuida?**
+**¿Por qué utilizar OAuth 2.0 y JWT en los microservicios?**
 
-Porque existen múltiples servicios y endpoints que deben controlar quién puede acceder a sus recursos. La autenticación mediante JWT y la autorización por roles permiten proteger cada API sin almacenar sesiones en el servidor.
+OAuth 2.0 centraliza la emisión y autorización de credenciales mediante el Authorization Server. Los JWT permiten que los Resource Servers validen los tokens sin mantener sesiones y los scopes restringen las operaciones permitidas. Los BFF mantienen su estrategia de seguridad específica por canal.
 
-**¿Cómo ayuda un Circuit Breaker a evitar que un fallo se propague dentro del sistema?**
+**¿Qué función cumple Docker Compose?**
 
-Cuando detecta una cantidad suficiente de fallos, abre el circuito y evita seguir ejecutando temporalmente la operación que está fallando. Esto reduce llamadas innecesarias a una dependencia con problemas y permite responder de forma controlada mientras se recupera.
+Docker Compose permite definir y levantar de manera reproducible los servicios, imágenes, puertos, variables de entorno, dependencias y red interna necesarios para ejecutar la arquitectura distribuida.
+
+**¿Cómo ayuda Resilience4j a mantener la disponibilidad?**
+
+Cuando el Circuit Breaker detecta suficientes fallos, abre el circuito y evita seguir ejecutando temporalmente la operación que está fallando. Esto reduce llamadas innecesarias a una dependencia con problemas y permite responder de forma controlada mientras se recupera.
+
+**¿Qué beneficios aporta Kafka?**
+
+Kafka desacopla al productor y al consumidor. `transaction-service` puede publicar un evento sin depender de la ejecución inmediata de `movement-service`, permitiendo procesamiento asíncrono y consumidores independientes.
 
 ### Evidencias
 
-Las evidencias se mantienen organizadas por entrega:
+Las evidencias técnicas se encuentran organizadas en las siguientes carpetas:
 
 - [`evidencias/semana_4/`](evidencias/semana_4/README.md): implementación inicial de los tres BFF.
 - [`evidencias/semana_5/`](evidencias/semana_5/README.md): HTTPS, JWT, autorización por canal, optimización de respuestas y validación global.
+
 - [`evidencias/semana_6/`](evidencias/semana_6/README.md): Config Server, Eureka, Circuit Breaker y seguridad de los microservicios.
 - [`evidencias/semana_7/`](evidencias/semana_7/README.md): Kafka, Publish/Subscribe, escalabilidad de consumidores y pruebas de tolerancia a fallos.
+- [`evidencias/semana_8/`](evidencias/semana_8/README.md): OAuth2, Docker, Docker Compose, Kafka y Resilience4j.
 
 ## Pruebas
 
@@ -978,7 +1059,7 @@ Resultados actuales:
 
 La validación global confirma que la evolución de seguridad y configuración de los BFF no rompe las funcionalidades Batch ni los endpoints desarrollados anteriormente.
 
-Adicionalmente, en Semana 7 se aprobaron tres pruebas unitarias específicas de Kafka: una del publicador y dos del consumidor. Se ejecutaron por separado y no forman parte del subtotal histórico de 42 pruebas Batch y BFF.
+Adicionalmente, se aprobaron tres pruebas unitarias específicas de Kafka: una del publicador y dos del consumidor. Se ejecutaron por separado y no forman parte del subtotal histórico de 42 pruebas Batch y BFF.
 
 ## Estado actual
 
@@ -1000,9 +1081,11 @@ Los tres Jobs principales se encuentran operativos:
 
 Los tres backends utilizan la misma base Oracle, pero exponen APIs, DTOs, reglas y controles de seguridad específicos para su respectivo frontend.
 
-La arquitectura distribuida utiliza además Spring Cloud Config en el puerto `8888` y Eureka Server en el puerto `8761`. Los microservicios consumen su configuración desde Config Server y se registran en Eureka.
+La arquitectura distribuida utiliza Spring Cloud Config en el puerto `8888`, Eureka Server en el puerto `8761` y un Authorization Server OAuth 2.0 en el puerto `9000`. Los microservicios consumen su configuración desde Config Server, se registran en Eureka y validan los JWT emitidos por el Authorization Server.
 
-`account-service` (`8091`), `transaction-service` (`8092`) y `movement-service` (`8093`) exponen APIs sobre los datos migrados de cuentas, transacciones y movimientos, respectivamente.
+`account-service` (`8091`), `transaction-service` (`8092`) y `movement-service` (`8093`) exponen APIs sobre los datos migrados de cuentas, transacciones y movimientos, respectivamente. Apache Kafka proporciona la comunicación asíncrona mediante el tópico `bank.transactions`.
+
+La infraestructura distribuida puede ejecutarse de forma integrada mediante `docker-compose.yaml`; Oracle ADB se mantiene como servicio externo.
 
 Resultados actuales del procesamiento Batch con los datos utilizados para validación:
 

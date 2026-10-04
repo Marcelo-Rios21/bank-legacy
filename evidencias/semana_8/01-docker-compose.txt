@@ -1,0 +1,32 @@
+=== SEMANA 8 - DOCKER Y DOCKER COMPOSE ===
+
+=== IMAGENES ===
+
+bank-legacy-authorization-server     s8             515MB
+bank-legacy-discovery-server         s8             581MB
+bank-legacy-config-server            s8             548MB
+bank-legacy-movement-service         s8             629MB
+bank-legacy-transaction-service      s8             629MB
+bank-legacy-account-service          s8             585MB
+apache/kafka                         4.1.2          674MB
+
+=== CONTENEDORES ===
+NAME                               IMAGE                                 COMMAND                  SERVICE                CREATED       STATUS                 PORTS
+bank-legacy-account-service        bank-legacy-account-service:s8        "java -jar /app/app...."   account-service        2 hours ago   Up 2 hours             127.0.0.1:8091->8091/tcp
+bank-legacy-authorization-server   bank-legacy-authorization-server:s8   "java -jar /app/app...."   authorization-server   4 hours ago   Up 4 hours             127.0.0.1:9000->9000/tcp
+bank-legacy-config-server          bank-legacy-config-server:s8          "java -jar /app/app...."   config-server          4 hours ago   Up 4 hours             127.0.0.1:8888->8888/tcp
+bank-legacy-discovery-server       bank-legacy-discovery-server:s8       "java -jar /app/app...."   discovery-server       4 hours ago   Up 4 hours             127.0.0.1:8761->8761/tcp
+bank-legacy-kafka                  apache/kafka:4.1.2                    "/__cacert_entrypoin..."   kafka                  4 hours ago   Up 4 hours (healthy)   127.0.0.1:9092->9092/tcp
+bank-legacy-movement-service       bank-legacy-movement-service:s8       "java -jar /app/app...."   movement-service       4 hours ago   Up 4 hours             127.0.0.1:8093->8093/tcp
+bank-legacy-transaction-service    bank-legacy-transaction-service:s8    "java -jar /app/app...."   transaction-service    4 hours ago   Up 4 hours             127.0.0.1:8092->8092/tcp
+
+=== KAFKA TOPIC ===
+Topic: bank.transactions	TopicId: IZbUvJ7sRkWr247rnT6YqQ	PartitionCount: 3	ReplicationFactor: 1	Configs: min.insync.replicas=1
+	Topic: bank.transactions	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+	Topic: bank.transactions	Partition: 1	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+	Topic: bank.transactions	Partition: 2	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+
+=== CONFIGURACION COMPOSE VALIDA ===
+docker-compose.yaml -> VALIDO
+
+
