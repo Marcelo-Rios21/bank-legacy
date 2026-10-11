@@ -55,7 +55,7 @@ public class MonthlyInterestJobConfig {
                 new FlatFileItemReaderBuilder<RawInterest>()
                         .name("monthlyInterestReader-" + partitionNumber)
                         .resource(new FileSystemResource(
-                                "data/semana_3/intereses.csv"))
+                                "data/eft/intereses_trimestrales.csv"))
                         .linesToSkip(1)
                         .delimited(delimited -> delimited
                                 .delimiter(",")

@@ -60,7 +60,7 @@ public class DailyTransactionJobConfig {
         return new FlatFileItemReaderBuilder<RawTransaction>()
                 .name("dailyTransactionReader-" + partitionNumber)
                 .resource(new FileSystemResource(
-                        "data/semana_3/transacciones.csv"))
+                        "data/eft/movimientos_financieros_diarios.csv"))
                 .linesToSkip(1)
                 .currentItemCount(startItem)
                 .maxItemCount(endItem)

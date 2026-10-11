@@ -34,15 +34,15 @@ Los archivos son leídos mediante Spring Batch, sus registros son validados y tr
 
 Los datos legacy utilizados provienen de:
 
-https://github.com/KariVillagran/bank_legacy_data
+https://github.com/KariVillagran/fin_legacy_data
 
 La aplicación actualmente procesa los archivos ubicados en:
 
 ```text
-data/semana_3/
-├── transacciones.csv
-├── intereses.csv
-└── cuentas_anuales.csv
+data/eft/
+├── movimientos_financieros_diarios.csv
+├── intereses_trimestrales.csv
+└── estados_financieros_anuales.csv
 ```
 
 ## Estructura del proyecto
@@ -104,7 +104,7 @@ Cuando un registro contiene datos inválidos, se lanza una excepción específic
 El Job `dailyTransactionJob` procesa:
 
 ```text
-data/semana_3/transacciones.csv
+data/eft/movimientos_financieros_diarios.csv
 ```
 
 Los registros contienen:
@@ -136,9 +136,9 @@ La ejecución actual con los datos utilizados para validación obtiene:
 
 ```text
 Registros leídos:      1000
-Registros persistidos: 401
-Registros inválidos:   599
-Filas finales Oracle:  401
+Registros persistidos: 392
+Registros inválidos:   608
+Filas finales Oracle:  392
 ```
 
 El Job también genera un resumen con la cantidad de registros recibidos, registros válidos, registros omitidos y posibles duplicados.
@@ -148,9 +148,9 @@ Resultado actual:
 ```text
 ===== RESUMEN TRANSACCIONES DIARIAS =====
 Total recibidas: 1000
-Validas persistidas: 401
-Invalidas omitidas: 599
-Posibles duplicados: 14 grupo(s), 28 registro(s)
+Validas persistidas: 392
+Invalidas omitidas: 608
+Posibles duplicados: 13 grupo(s), 27 registro(s)
 ==========================================
 ```
 
@@ -161,7 +161,7 @@ Posibles duplicados: 14 grupo(s), 28 registro(s)
 El Job `monthlyInterestJob` procesa:
 
 ```text
-data/semana_3/intereses.csv
+data/eft/intereses_trimestrales.csv
 ```
 
 Los registros contienen:
@@ -214,12 +214,12 @@ La ejecución actual obtiene:
 
 ```text
 Registros leídos:       1000
-Registros persistidos:  263
-Registros inválidos:    737
+Registros persistidos:  296
+Registros inválidos:    704
 Cuentas finales Oracle: 50
 ```
 
-Los 263 registros válidos pueden corresponder varias veces a una misma cuenta. Como el Writer utiliza `MERGE` por `CUENTA_ID`, el resultado final contiene 50 cuentas distintas.
+Los 296 registros válidos pueden corresponder varias veces a una misma cuenta. Como el Writer utiliza `MERGE` por `CUENTA_ID`, el resultado final contiene 50 cuentas distintas.
 
 ---
 
@@ -228,7 +228,7 @@ Los 263 registros válidos pueden corresponder varias veces a una misma cuenta. 
 El Job `annualAccountJob` procesa:
 
 ```text
-data/semana_3/cuentas_anuales.csv
+data/eft/estados_financieros_anuales.csv
 ```
 
 El proceso está compuesto por tres Steps:
@@ -288,10 +288,10 @@ La ejecución actual obtiene:
 
 ```text
 Registros leídos:      1000
-Registros persistidos: 732
-Registros inválidos:   268
+Registros persistidos: 779
+Registros inválidos:   221
 Cuentas distintas:     20
-Filas finales Oracle:  732
+Filas finales Oracle:  779
 ```
 
 #### annualAccountAuditStep
@@ -315,21 +315,21 @@ El reporte actual es:
 
 ```text
 ===== REPORTE DE AUDITORIA ANUAL =====
-Periodo: 2024-01-02 a 2024-12-29
+Periodo: 2024-01-01 a 2024-12-30
 
 Registros leidos: 1000
-Registros persistidos: 732
-Registros invalidos omitidos: 268
+Registros persistidos: 779
+Registros invalidos omitidos: 221
 Cuentas distintas: 20
 
-Depositos: 262
-Retiros: 205
-Compras: 232
-Pagos: 33
+Depositos: 267
+Retiros: 213
+Compras: 257
+Pagos: 42
 
-Movimientos con monto cero: 9
-Movimientos con monto negativo: 199
-Balance neto de movimientos: 1048600
+Movimientos con monto cero: 95
+Movimientos con monto negativo: 187
+Balance neto de movimientos: 909600
 ======================================
 ```
 
@@ -549,13 +549,7 @@ En la prueba controlada de `dailyTransactionJob` se obtuvo:
 [RETRY DEMO] Reintento exitoso. El procesamiento continua.
 ```
 
-El Job terminó `COMPLETED` y mantuvo:
-
-```text
-Total recibidas: 1000
-Validas persistidas: 401
-Invalidas omitidas: 599
-```
+El Job terminó `COMPLETED`, confirmando que el fallo transitorio fue reintentado correctamente y que el procesamiento pudo continuar.
 
 Por lo tanto:
 
@@ -594,11 +588,11 @@ En la reejecución se procesaron solamente:
 
 ```text
 Registros leídos:      175
-Registros persistidos: 64
-Registros inválidos:   111
+Registros persistidos: 67
+Registros inválidos:   108
 ```
 
-La segunda ejecución terminó `COMPLETED` y `DAILY_TRANSACTION` quedó con 401 filas.
+La segunda ejecución terminó `COMPLETED` y `DAILY_TRANSACTION` quedó con 392 filas.
 
 Esto demuestra que una partición fallida puede recuperarse sin volver a procesar todo el batch.
 
@@ -696,14 +690,7 @@ Se compararon tres configuraciones utilizando `dailyTransactionJob`:
 | B | 4 | 4 | 25 | 3.157 s | 3.973 s |
 | C | 8 | 4 | 25 | 3.861 s | 4.676 s |
 
-Las tres ejecuciones conservaron:
-
-```text
-Total recibidas: 1000
-Validas persistidas: 401
-Invalidas omitidas: 599
-Estado: COMPLETED
-```
+Las tres configuraciones finalizaron `COMPLETED`. Los tiempos corresponden a la prueba comparativa de escalamiento realizada durante el desarrollo; la configuración de `partitioning`, hilos y tamaño de chunk se mantiene en la versión EFT.
 
 La configuración A obtuvo el menor tiempo en la medición final, aunque A y B presentaron tiempos muy similares. La diferencia entre ambas fue mínima para este volumen de datos.
 
@@ -1091,9 +1078,9 @@ Resultados actuales del procesamiento Batch con los datos utilizados para valida
 
 | Job | Leídos | Persistidos | Omitidos | Resultado final DB |
 |---|---:|---:|---:|---:|
-| Daily | 1000 | 401 | 599 | 401 transacciones |
-| Monthly | 1000 | 263 | 737 | 50 cuentas |
-| Annual | 1000 | 732 | 268 | 732 movimientos |
+| Daily | 1000 | 392 | 608 | 392 transacciones |
+| Monthly | 1000 | 296 | 704 | 50 cuentas |
+| Annual | 1000 | 779 | 221 | 779 movimientos |
 
 La aplicación actualmente lee archivos CSV legacy, valida y transforma sus registros, maneja datos inválidos mediante `skip`, reintenta fallos temporales mediante `retry`, procesa datos en paralelo mediante partitioning, recupera ejecuciones mediante restart/checkpoint, persiste los resultados en Oracle Database y genera los reportes correspondientes.
 

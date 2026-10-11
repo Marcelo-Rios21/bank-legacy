@@ -60,7 +60,7 @@ public class AnnualAccountJobConfig {
         return new FlatFileItemReaderBuilder<RawAnnualAccount>()
                 .name("annualAccountReader-" + partitionNumber)
                 .resource(new FileSystemResource(
-                        "data/semana_3/cuentas_anuales.csv"))
+                        "data/eft/estados_financieros_anuales.csv"))
                 .linesToSkip(1)
                 .currentItemCount(startItem)
                 .maxItemCount(endItem)

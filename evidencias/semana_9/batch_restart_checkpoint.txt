@@ -1,0 +1,28 @@
+=== RESTART Y CHECKPOINT - DATASET OFICIAL EFT ===
+JobInstance: 63
+JobExecution 880 -> FAILED | inicio: 2026-10-11 13:29:43 | fin: 2026-10-11 13:29:46
+JobExecution 900 -> COMPLETED | inicio: 2026-10-11 13:29:55 | fin: 2026-10-11 13:29:58
+
+Execution 880 | dailyTransactionCleanupStep -> COMPLETED | read=0 | write=0 | skip=0 | commit=1 | rollback=0
+Execution 880 | dailyTransactionStep -> FAILED | read=850 | write=325 | skip=519 | commit=33 | rollback=1
+Execution 880 | dailyTransactionWorkerStep:partition0 -> COMPLETED | read=250 | write=99 | skip=151 | commit=10 | rollback=0
+Execution 880 | dailyTransactionWorkerStep:partition1 -> COMPLETED | read=250 | write=105 | skip=145 | commit=10 | rollback=0
+Execution 880 | dailyTransactionWorkerStep:partition2 -> FAILED | read=100 | write=22 | skip=72 | commit=3 | rollback=1
+Execution 880 | dailyTransactionWorkerStep:partition3 -> COMPLETED | read=250 | write=99 | skip=151 | commit=10 | rollback=0
+
+Execution 900 | dailyTransactionStep -> COMPLETED | read=175 | write=67 | skip=108 | commit=7 | rollback=0
+Execution 900 | dailyTransactionWorkerStep:partition2 -> COMPLETED | read=175 | write=67 | skip=108 | commit=7 | rollback=0
+Execution 900 | dailyTransactionSummaryStep -> COMPLETED | read=0 | write=0 | skip=0 | commit=1 | rollback=0
+
+Filas finales DAILY_TRANSACTION: 392
+
+Conclusiones:
+- La segunda ejecucion reutilizo la misma JobInstance.
+- dailyTransactionCleanupStep no se ejecuto nuevamente.
+- partition0, partition1 y partition3 ya estaban COMPLETED.
+- Solo partition2 fue retomada en la segunda ejecucion.
+- El resultado final quedo en 392 filas validas.
+- Los conteos de lectura de ambas ejecuciones no deben sumarse como
+  total del archivo, porque el rollback provoca relectura desde el checkpoint.
+
+=== FIN EVIDENCIA RESTART ===

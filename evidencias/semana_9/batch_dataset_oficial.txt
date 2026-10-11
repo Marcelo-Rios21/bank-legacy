@@ -1,0 +1,66 @@
+============================================================
+VALIDACION BATCH - DATASET OFICIAL EFT
+============================================================
+
+Fuente oficial:
+https://github.com/KariVillagran/fin_legacy_data
+
+Archivos utilizados:
+- data/eft/movimientos_financieros_diarios.csv
+- data/eft/intereses_trimestrales.csv
+- data/eft/estados_financieros_anuales.csv
+
+------------------------------------------------------------
+1. dailyTransactionJob
+------------------------------------------------------------
+Registros leidos: 1000
+Registros persistidos: 392
+Registros invalidos omitidos: 608
+Posibles duplicados: 13 grupo(s), 27 registro(s)
+Filas finales DAILY_TRANSACTION: 392
+
+Comprobacion:
+392 + 608 = 1000
+
+------------------------------------------------------------
+2. monthlyInterestJob
+------------------------------------------------------------
+Registros leidos: 1000
+Registros persistidos: 296
+Registros invalidos omitidos: 704
+Cuentas finales MONTHLY_INTEREST: 50
+
+Comprobacion:
+296 + 704 = 1000
+
+El archivo oficial se denomina intereses_trimestrales.csv.
+El Job conserva el nombre monthlyInterestJob porque implementa
+el proceso de calculo mensual definido por el proyecto.
+
+------------------------------------------------------------
+3. annualAccountJob
+------------------------------------------------------------
+Periodo: 2024-01-01 a 2024-12-30
+Registros leidos: 1000
+Registros persistidos: 779
+Registros invalidos omitidos: 221
+Cuentas distintas: 20
+
+Depositos: 267
+Retiros: 213
+Compras: 257
+Pagos: 42
+
+Movimientos con monto cero: 95
+Movimientos con monto negativo: 187
+Balance neto de movimientos: 909600
+
+Comprobacion:
+779 + 221 = 1000
+
+============================================================
+RESULTADO
+============================================================
+Los tres procesos Batch fueron ejecutados con el conjunto de
+datos oficial EFT y completaron el procesamiento esperado.
+============================================================
