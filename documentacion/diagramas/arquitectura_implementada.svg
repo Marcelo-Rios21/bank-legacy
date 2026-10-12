@@ -1,0 +1,501 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1600"
+     height="1050"
+     viewBox="0 0 1600 1050">
+
+  <defs>
+    <marker id="arrow"
+            markerWidth="10"
+            markerHeight="10"
+            refX="9"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+
+    <style>
+      .title {
+        font: bold 34px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .subtitle {
+        font: 20px Arial, sans-serif;
+        fill: #475569;
+      }
+
+      .section {
+        font: bold 22px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .boxTitle {
+        font: bold 18px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .text {
+        font: 16px Arial, sans-serif;
+        fill: #334155;
+      }
+
+      .small {
+        font: 14px Arial, sans-serif;
+        fill: #475569;
+      }
+
+      .box {
+        fill: #ffffff;
+        stroke: #64748b;
+        stroke-width: 2;
+        rx: 12;
+      }
+
+      .batch {
+        fill: #eff6ff;
+        stroke: #2563eb;
+      }
+
+      .bff {
+        fill: #f5f3ff;
+        stroke: #7c3aed;
+      }
+
+      .cloud {
+        fill: #ecfeff;
+        stroke: #0891b2;
+      }
+
+      .service {
+        fill: #f0fdf4;
+        stroke: #16a34a;
+      }
+
+      .infra {
+        fill: #fff7ed;
+        stroke: #ea580c;
+      }
+
+      .database {
+        fill: #fefce8;
+        stroke: #ca8a04;
+      }
+
+      .boundary {
+        fill: none;
+        stroke: #94a3b8;
+        stroke-width: 2;
+        stroke-dasharray: 10 7;
+        rx: 18;
+      }
+
+      .arrow {
+        stroke: #334155;
+        stroke-width: 2;
+        fill: none;
+        marker-end: url(#arrow);
+      }
+
+      .dash {
+        stroke: #64748b;
+        stroke-width: 2;
+        fill: none;
+        stroke-dasharray: 7 6;
+        marker-end: url(#arrow);
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1050" fill="#f8fafc"/>
+
+  <text x="60" y="58" class="title">
+    Bank Legacy - Arquitectura implementada y validada
+  </text>
+
+  <text x="60" y="90" class="subtitle">
+    Spring Batch + BFF por canal + microservicios Spring Cloud + Kafka + Oracle
+  </text>
+
+
+  <!-- BATCH -->
+
+  <text x="60" y="145" class="section">
+    Procesamiento legacy
+  </text>
+
+  <rect x="60" y="175" width="270" height="95"
+        class="box batch"/>
+
+  <text x="195" y="208"
+        text-anchor="middle"
+        class="boxTitle">
+    Dataset oficial EFT
+  </text>
+
+  <text x="195" y="235"
+        text-anchor="middle"
+        class="small">
+    CSV
+  </text>
+
+  <text x="195" y="255"
+        text-anchor="middle"
+        class="small">
+    data/eft/
+  </text>
+
+
+  <rect x="385" y="150" width="310" height="170"
+        class="box batch"/>
+
+  <text x="540" y="185"
+        text-anchor="middle"
+        class="boxTitle">
+    Spring Batch
+  </text>
+
+  <text x="540" y="218"
+        text-anchor="middle"
+        class="text">
+    dailyTransactionJob
+  </text>
+
+  <text x="540" y="248"
+        text-anchor="middle"
+        class="text">
+    monthlyInterestJob
+  </text>
+
+  <text x="540" y="278"
+        text-anchor="middle"
+        class="text">
+    annualAccountJob
+  </text>
+
+  <text x="540" y="305"
+        text-anchor="middle"
+        class="small">
+    Partitioning · Skip · Retry · Restart
+  </text>
+
+  <path d="M330 222 L385 222"
+        class="arrow"/>
+
+
+  <!-- BFF -->
+
+  <text x="60" y="390" class="section">
+    Backend for Frontend
+  </text>
+
+  <rect x="60" y="420" width="190" height="95"
+        class="box bff"/>
+
+  <text x="155" y="455"
+        text-anchor="middle"
+        class="boxTitle">
+    BFF Web
+  </text>
+
+  <text x="155" y="483"
+        text-anchor="middle"
+        class="small">
+    Rol WEB
+  </text>
+
+
+  <rect x="285" y="420" width="190" height="95"
+        class="box bff"/>
+
+  <text x="380" y="455"
+        text-anchor="middle"
+        class="boxTitle">
+    BFF Mobile
+  </text>
+
+  <text x="380" y="483"
+        text-anchor="middle"
+        class="small">
+    Rol MOBILE
+  </text>
+
+
+  <rect x="510" y="420" width="190" height="95"
+        class="box bff"/>
+
+  <text x="605" y="455"
+        text-anchor="middle"
+        class="boxTitle">
+    BFF ATM
+  </text>
+
+  <text x="605" y="483"
+        text-anchor="middle"
+        class="small">
+    Rol ATM
+  </text>
+
+  <text x="380" y="545"
+        text-anchor="middle"
+        class="small">
+    JWT y reglas independientes por canal
+  </text>
+
+
+  <!-- DOCKER BOUNDARY -->
+
+  <rect x="770" y="130"
+        width="770"
+        height="700"
+        class="boundary"/>
+
+  <text x="795" y="165"
+        class="section">
+    Arquitectura distribuida validada con Docker Compose
+  </text>
+
+
+  <!-- CLOUD INFRA -->
+
+  <rect x="810" y="205"
+        width="205" height="100"
+        class="box cloud"/>
+
+  <text x="912" y="240"
+        text-anchor="middle"
+        class="boxTitle">
+    Config Server
+  </text>
+
+  <text x="912" y="270"
+        text-anchor="middle"
+        class="small">
+    :8888
+  </text>
+
+
+  <rect x="1050" y="205"
+        width="205" height="100"
+        class="box cloud"/>
+
+  <text x="1152" y="240"
+        text-anchor="middle"
+        class="boxTitle">
+    Eureka Server
+  </text>
+
+  <text x="1152" y="270"
+        text-anchor="middle"
+        class="small">
+    :8761
+  </text>
+
+
+  <rect x="1290" y="205"
+        width="210" height="100"
+        class="box cloud"/>
+
+  <text x="1395" y="238"
+        text-anchor="middle"
+        class="boxTitle">
+    Authorization Server
+  </text>
+
+  <text x="1395" y="268"
+        text-anchor="middle"
+        class="small">
+    OAuth 2.0 · :9000
+  </text>
+
+
+  <!-- MICROS -->
+
+  <rect x="810" y="400"
+        width="205" height="115"
+        class="box service"/>
+
+  <text x="912" y="438"
+        text-anchor="middle"
+        class="boxTitle">
+    account-service
+  </text>
+
+  <text x="912" y="468"
+        text-anchor="middle"
+        class="small">
+    :8091
+  </text>
+
+  <text x="912" y="492"
+        text-anchor="middle"
+        class="small">
+    account.read
+  </text>
+
+
+  <rect x="1050" y="400"
+        width="205" height="115"
+        class="box service"/>
+
+  <text x="1152" y="438"
+        text-anchor="middle"
+        class="boxTitle">
+    transaction-service
+  </text>
+
+  <text x="1152" y="468"
+        text-anchor="middle"
+        class="small">
+    :8092
+  </text>
+
+  <text x="1152" y="492"
+        text-anchor="middle"
+        class="small">
+    read / publish
+  </text>
+
+
+  <rect x="1290" y="400"
+        width="210" height="115"
+        class="box service"/>
+
+  <text x="1395" y="438"
+        text-anchor="middle"
+        class="boxTitle">
+    movement-service
+  </text>
+
+  <text x="1395" y="468"
+        text-anchor="middle"
+        class="small">
+    :8093
+  </text>
+
+  <text x="1395" y="492"
+        text-anchor="middle"
+        class="small">
+    movement.read
+  </text>
+
+
+  <!-- KAFKA -->
+
+  <rect x="1050" y="620"
+        width="450" height="120"
+        class="box infra"/>
+
+  <text x="1275" y="655"
+        text-anchor="middle"
+        class="boxTitle">
+    Apache Kafka
+  </text>
+
+  <text x="1275" y="685"
+        text-anchor="middle"
+        class="text">
+    bank.transactions
+  </text>
+
+  <text x="1275" y="712"
+        text-anchor="middle"
+        class="small">
+    3 particiones · movement-service-group
+  </text>
+
+
+  <!-- CLOUD LINKS -->
+
+  <path d="M912 305 L912 400"
+        class="dash"/>
+
+  <path d="M1152 305 L1152 400"
+        class="dash"/>
+
+  <path d="M1395 305 L1395 400"
+        class="dash"/>
+
+  <path d="M1015 255 L1050 420"
+        class="dash"/>
+
+  <path d="M1255 255 L1290 420"
+        class="dash"/>
+
+  <path d="M1290 275 L1015 420"
+        class="dash"/>
+
+  <path d="M1152 515 L1152 620"
+        class="arrow"/>
+
+  <path d="M1395 620 L1395 515"
+        class="arrow"/>
+
+  <text x="1200" y="575"
+        class="small">
+    Publish / Subscribe
+  </text>
+
+
+  <!-- ORACLE -->
+
+  <rect x="560" y="875"
+        width="480" height="120"
+        class="box database"/>
+
+  <text x="800" y="915"
+        text-anchor="middle"
+        class="boxTitle">
+    Oracle Database
+  </text>
+
+  <text x="800" y="945"
+        text-anchor="middle"
+        class="text">
+    Persistencia compartida
+  </text>
+
+  <text x="800" y="972"
+        text-anchor="middle"
+        class="small">
+    Servicio externo
+  </text>
+
+
+  <!-- TO ORACLE -->
+
+  <path d="M540 320 L650 875"
+        class="arrow"/>
+
+  <path d="M155 515 L650 875"
+        class="arrow"/>
+
+  <path d="M380 515 L725 875"
+        class="arrow"/>
+
+  <path d="M605 515 L780 875"
+        class="arrow"/>
+
+  <path d="M912 515 L850 875"
+        class="arrow"/>
+
+  <path d="M1152 515 L925 875"
+        class="arrow"/>
+
+  <path d="M1395 515 L1000 875"
+        class="arrow"/>
+
+
+  <!-- NOTES -->
+
+  <text x="1120" y="790"
+        class="small">
+    Resilience4j protege el acceso de los microservicios a Oracle
+  </text>
+
+  <text x="60" y="1025"
+        class="small">
+    Nota: los BFF y Spring Batch forman parte del proyecto, pero no están incluidos en el docker-compose.yaml actual.
+  </text>
+
+</svg>

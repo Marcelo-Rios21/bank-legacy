@@ -1,0 +1,408 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1600"
+     height="1000"
+     viewBox="0 0 1600 1000">
+
+  <defs>
+    <marker id="arrow"
+            markerWidth="10"
+            markerHeight="10"
+            refX="9"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+
+    <style>
+      .title {
+        font: bold 34px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .warning {
+        font: bold 21px Arial, sans-serif;
+        fill: #b91c1c;
+      }
+
+      .section {
+        font: bold 22px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .boxTitle {
+        font: bold 18px Arial, sans-serif;
+        fill: #0f172a;
+      }
+
+      .text {
+        font: 16px Arial, sans-serif;
+        fill: #334155;
+      }
+
+      .small {
+        font: 14px Arial, sans-serif;
+        fill: #475569;
+      }
+
+      .box {
+        fill: #ffffff;
+        stroke: #64748b;
+        stroke-width: 2;
+        rx: 12;
+      }
+
+      .aws {
+        fill: #fff7ed;
+        stroke: #ea580c;
+      }
+
+      .service {
+        fill: #f0fdf4;
+        stroke: #16a34a;
+      }
+
+      .infra {
+        fill: #ecfeff;
+        stroke: #0891b2;
+      }
+
+      .external {
+        fill: #fefce8;
+        stroke: #ca8a04;
+      }
+
+      .security {
+        fill: #f5f3ff;
+        stroke: #7c3aed;
+      }
+
+      .boundary {
+        fill: none;
+        stroke: #f59e0b;
+        stroke-width: 3;
+        stroke-dasharray: 12 8;
+        rx: 18;
+      }
+
+      .arrow {
+        stroke: #334155;
+        stroke-width: 2;
+        fill: none;
+        marker-end: url(#arrow);
+      }
+
+      .dash {
+        stroke: #64748b;
+        stroke-width: 2;
+        fill: none;
+        stroke-dasharray: 7 6;
+        marker-end: url(#arrow);
+      }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#f8fafc"/>
+
+  <text x="60" y="58" class="title">
+    Bank Legacy - Arquitectura cloud objetivo
+  </text>
+
+  <text x="60" y="92" class="warning">
+    PROPUESTA DE DESPLIEGUE AWS - NO IMPLEMENTADA ACTUALMENTE
+  </text>
+
+  <rect x="60" y="155"
+        width="250" height="110"
+        class="box aws"/>
+
+  <text x="185" y="195"
+        text-anchor="middle"
+        class="boxTitle">
+    Amazon ECR
+  </text>
+
+  <text x="185" y="225"
+        text-anchor="middle"
+        class="small">
+    Imagenes versionadas
+  </text>
+
+  <rect x="675" y="135"
+        width="270" height="115"
+        class="box aws"/>
+
+  <text x="810" y="175"
+        text-anchor="middle"
+        class="boxTitle">
+    Application Load Balancer
+  </text>
+
+  <text x="810" y="207"
+        text-anchor="middle"
+        class="small">
+    Entrada HTTP/HTTPS
+  </text>
+
+  <rect x="390" y="310"
+        width="850" height="540"
+        class="boundary"/>
+
+  <text x="420" y="350"
+        class="section">
+    Amazon ECS / AWS Fargate
+  </text>
+
+  <rect x="430" y="390"
+        width="210" height="100"
+        class="box infra"/>
+
+  <text x="535" y="428"
+        text-anchor="middle"
+        class="boxTitle">
+    Config Server
+  </text>
+
+  <text x="535" y="458"
+        text-anchor="middle"
+        class="small">
+    Servicio interno
+  </text>
+
+  <rect x="685" y="390"
+        width="210" height="100"
+        class="box infra"/>
+
+  <text x="790" y="428"
+        text-anchor="middle"
+        class="boxTitle">
+    Eureka Server
+  </text>
+
+  <text x="790" y="458"
+        text-anchor="middle"
+        class="small">
+    Servicio interno
+  </text>
+
+  <rect x="940" y="390"
+        width="250" height="100"
+        class="box security"/>
+
+  <text x="1065" y="425"
+        text-anchor="middle"
+        class="boxTitle">
+    Authorization Server
+  </text>
+
+  <text x="1065" y="455"
+        text-anchor="middle"
+        class="small">
+    OAuth 2.0
+  </text>
+
+  <rect x="430" y="580"
+        width="220" height="115"
+        class="box service"/>
+
+  <text x="540" y="618"
+        text-anchor="middle"
+        class="boxTitle">
+    account-service
+  </text>
+
+  <text x="540" y="650"
+        text-anchor="middle"
+        class="small">
+    ECS Service
+  </text>
+
+  <rect x="690" y="580"
+        width="240" height="115"
+        class="box service"/>
+
+  <text x="810" y="618"
+        text-anchor="middle"
+        class="boxTitle">
+    transaction-service
+  </text>
+
+  <text x="810" y="650"
+        text-anchor="middle"
+        class="small">
+    ECS Service
+  </text>
+
+  <rect x="970" y="580"
+        width="220" height="115"
+        class="box service"/>
+
+  <text x="1080" y="618"
+        text-anchor="middle"
+        class="boxTitle">
+    movement-service
+  </text>
+
+  <text x="1080" y="650"
+        text-anchor="middle"
+        class="small">
+    ECS Service
+  </text>
+
+  <rect x="690" y="750"
+        width="500" height="75"
+        class="box aws"/>
+
+  <text x="940" y="780"
+        text-anchor="middle"
+        class="boxTitle">
+    Kafka en contenedor o Amazon MSK
+  </text>
+
+  <text x="940" y="805"
+        text-anchor="middle"
+        class="small">
+    bank.transactions - 3 particiones actuales
+  </text>
+
+  <rect x="1290" y="330"
+        width="250" height="115"
+        class="box security"/>
+
+  <text x="1415" y="368"
+        text-anchor="middle"
+        class="boxTitle">
+    Secrets Manager
+  </text>
+
+  <text x="1415" y="398"
+        text-anchor="middle"
+        class="small">
+    Credenciales y secretos
+  </text>
+
+  <rect x="1290" y="510"
+        width="250" height="115"
+        class="box aws"/>
+
+  <text x="1415" y="548"
+        text-anchor="middle"
+        class="boxTitle">
+    CloudWatch
+  </text>
+
+  <text x="1415" y="578"
+        text-anchor="middle"
+        class="small">
+    Logs y metricas
+  </text>
+
+  <rect x="1290" y="690"
+        width="250" height="115"
+        class="box aws"/>
+
+  <text x="1415" y="728"
+        text-anchor="middle"
+        class="boxTitle">
+    Auto Scaling
+  </text>
+
+  <text x="1415" y="758"
+        text-anchor="middle"
+        class="small">
+    Escalamiento por servicio
+  </text>
+
+  <rect x="60" y="680"
+        width="260" height="125"
+        class="box external"/>
+
+  <text x="190" y="720"
+        text-anchor="middle"
+        class="boxTitle">
+    Oracle Database
+  </text>
+
+  <text x="190" y="750"
+        text-anchor="middle"
+        class="text">
+    Servicio externo
+  </text>
+
+  <text x="190" y="778"
+        text-anchor="middle"
+        class="small">
+    Acceso de red controlado
+  </text>
+
+  <path d="M310 210 L430 390"
+        class="dash"/>
+
+  <path d="M810 250 L810 580"
+        class="arrow"/>
+
+  <path d="M810 250 L540 580"
+        class="arrow"/>
+
+  <path d="M810 250 L1080 580"
+        class="arrow"/>
+
+  <path d="M535 490 L540 580"
+        class="dash"/>
+
+  <path d="M790 490 L810 580"
+        class="dash"/>
+
+  <path d="M1065 490 L1080 580"
+        class="dash"/>
+
+  <path d="M810 695 L810 750"
+        class="arrow"/>
+
+  <path d="M1080 750 L1080 695"
+        class="arrow"/>
+
+  <path d="M430 640 L320 730"
+        class="arrow"/>
+
+  <path d="M690 640 L320 750"
+        class="arrow"/>
+
+  <path d="M970 640 L320 770"
+        class="arrow"/>
+
+  <path d="M1290 387 L1190 430"
+        class="dash"/>
+
+  <path d="M1290 567 L1190 620"
+        class="dash"/>
+
+  <path d="M1290 747 L1190 665"
+        class="dash"/>
+
+  <text x="60" y="900"
+        class="section">
+    Consideraciones
+  </text>
+
+  <text x="60" y="932"
+        class="text">
+    Config Server, Eureka y Kafka deben permanecer en red privada.
+  </text>
+
+  <text x="60" y="958"
+        class="text">
+    El ruteo del ALB y sus health checks se configuran durante un despliegue real.
+  </text>
+
+  <text x="850" y="932"
+        class="text">
+    No se asume /actuator/health porque Actuator no fue incorporado.
+  </text>
+
+  <text x="850" y="958"
+        class="text">
+    AWS solo se declara implementado cuando existan recursos realmente desplegados.
+  </text>
+
+</svg>

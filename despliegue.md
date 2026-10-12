@@ -1,17 +1,8 @@
 # Despliegue - Bank Legacy
 
-## 1. Objetivo
+## 1. Alcance del despliegue
 
-Este documento describe el despliegue de la arquitectura distribuida de Bank Legacy.
-
-Se distinguen dos escenarios:
-
-1. ejecución local validada mediante Docker Compose;
-2. arquitectura objetivo para despliegue y escalamiento horizontal en AWS.
-
-La ejecución con Docker Compose fue comprobada durante el desarrollo.
-
-La sección AWS representa una propuesta de despliegue cloud basada en la arquitectura implementada. No implica que exista actualmente una infraestructura AWS activa.
+La solución fue validada localmente mediante Docker Compose. La arquitectura AWS descrita en este documento corresponde a una propuesta de despliegue cloud y escalamiento horizontal; no representa una infraestructura AWS actualmente desplegada.
 
 ## 2. Componentes desplegables
 
